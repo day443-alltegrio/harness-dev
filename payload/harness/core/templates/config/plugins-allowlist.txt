@@ -1,0 +1,6 @@
+# Claude Code plugins, marketplaces and MCP servers allowed in this project
+# (checked by harness/core/scripts/supply_chain.py against .claude/settings.json and .mcp.json).
+# One per line: kind:name  reason and review date.
+#   plugin:<name>@<marketplace>   reviewed 2026-10-23, why we need it
+#   marketplace:<name>            reviewed 2026-10-23, who maintains it
+#   mcp:<server>                  reviewed 2026-10-23, what it can read and write

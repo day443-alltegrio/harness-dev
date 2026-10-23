@@ -1,0 +1,4 @@
+# Accepted dependency vulnerabilities (harness/core/scripts/supply_chain.py).
+# One per line: id  review-date  reason. The id may be any alias (PYSEC, GHSA, CVE).
+# Past the review date the finding fails again. CRITICAL cannot be accepted.
+#   GHSA-xxxx-xxxx-xxxx  2026-12-01  only reachable through the admin upload, admins are staff

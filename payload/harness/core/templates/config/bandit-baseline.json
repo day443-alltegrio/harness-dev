@@ -1,0 +1,4 @@
+{
+  "_comment": "Accepted number of MEDIUM bandit findings per test id (harness/core/scripts/commit_scan.py, scan.bandit in harness.json). A new finding above the baseline fails; HIGH always fails. Lower the numbers as findings are fixed.",
+  "medium": {}
+}

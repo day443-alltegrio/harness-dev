@@ -1,0 +1,8 @@
+{
+  "_comment": "Context budget of the agent in UTF-8 bytes, checked by harness/core/scripts/context_budget.py. kinds: imports (a file with its @imports), files (a fixed list), skills (descriptions of .claude/skills/*/SKILL.md), memory (agent memory of this project on this machine). A limit is raised on purpose, by an ordinary change; over 90% is a reason to clean up, not to raise.",
+  "budgets": [
+    {"name": "always_loaded", "kind": "imports", "entry": "CLAUDE.md", "max_bytes": 24000},
+    {"name": "skill_descriptions", "kind": "skills", "dir": ".claude/skills", "max_bytes": 24000, "max_bytes_each": 1536},
+    {"name": "agent_memory", "kind": "memory", "dir": "~/.claude/projects/{slug}/memory", "optional": true, "max_bytes": 48000}
+  ]
+}

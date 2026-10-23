@@ -1,0 +1,3 @@
+# Local evidence: last deploy report, deploy journal, snapshot, scanner caches.
+.state/
+__pycache__/

@@ -1,0 +1,55 @@
+{
+  "_comment": "Rules of harness/core/scripts/style_check.py for human-facing Markdown. scope and exclude are relative to the project root. banned: characters that never appear in our texts (a violation, always fixed). cliches: stock phrases per language, each a regex or a [regex, label] pair (a suspicion, read by eye). Keep the languages the project writes in.",
+  "scope": ["docs", "harness"],
+  "exclude": ["docs/vendor/", "harness/.state/"],
+  "ignore_mark": "style-check: ignore",
+  "banned": {
+    "—": "em dash, use a hyphen",
+    "–": "en dash, use a hyphen",
+    "…": "one-character ellipsis",
+    "→": "arrow, use ->",
+    "«": "angle quote, use a straight quote",
+    "»": "angle quote, use a straight quote",
+    "·": "middle dot"
+  },
+  "cliches": {
+    "en": [
+      "\\bdelve(s|d)? into\\b",
+      "\\bit(?: is|'s) worth noting\\b",
+      "\\bplays? a (?:crucial|pivotal|vital) role\\b",
+      "\\bin today's (?:fast-paced|digital)\\b",
+      "\\bseamless(?:ly)?\\b",
+      "\\bleverag(?:e|es|ing)\\b",
+      "\\ba testament to\\b",
+      "\\bnavigat(?:e|ing) the complexit",
+      "\\bunlock(?:s|ing)? the (?:power|potential)\\b",
+      "\\bgame[- ]changer\\b",
+      "\\bcutting[- ]edge\\b",
+      "\\bin conclusion\\b",
+      "\\bmoreover\\b",
+      "\\bfurthermore\\b"
+    ],
+    "uk": [
+      "\\bслід зазначити\\b",
+      "\\bварто відзначити\\b",
+      "\\bнеобхідно відмітити\\b",
+      "\\bявляє собою\\b",
+      "\\bу рамках\\b",
+      "\\bз метою\\b",
+      "\\bтаким чином\\b",
+      "\\bв цілому\\b",
+      "\\bданому випадку\\b",
+      ["\\bдан(ий|ого|ому) підхід", "даний підхід"],
+      ["\\bкомплексн\\w+ підхід", "комплексний підхід"],
+      ["\\bефективн\\w+ рішенн", "ефективне рішення"],
+      ["\\bздійсн(юється|юються|ення)\\b", "здійснюється"],
+      "\\bвідіграє важливу роль\\b"
+    ]
+  },
+  "triad_words": {
+    "en": "\\bthree\\b",
+    "uk": "\\b(три|трьох|трьома)\\b"
+  },
+  "bold_lead_share": 0.45,
+  "triads_per_kb": 1.2
+}

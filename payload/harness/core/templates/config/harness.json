@@ -1,0 +1,47 @@
+{
+  "_comment": "Project settings of the harness checks. Every key is optional: a missing key keeps the default from harness/core/scripts/harness_config.py, where each key is explained. Nested objects merge key by key, lists replace the default.",
+  "project": "my-project",
+  "deploy_branch": "main",
+  "deployed_ref": "refs/harness/deployed",
+  "_generated": "Path prefixes the build or the deploy rewrites, e.g. [\"web/dist/\"]: they do not make the tree dirty.",
+  "generated": [],
+  "_build_stamp": "Optional build provenance, e.g. {\"file\": \"web/dist/version.json\", \"key\": \"version\"}: the value starts with the short HEAD, \"+\" right after it for a dirty tree.",
+  "build_stamp": null,
+  "stale_hours": 36,
+  "timezone": null,
+  "contracts": {
+    "dir": "harness/project/contracts/",
+    "max_files": 30,
+    "risky": [
+      {"match": "^(migrations|db/migrations|sql)/", "label": "database schema"},
+      {"match": "^(infra/)?deploy/[^/]+$", "label": "deploy scripts"},
+      {"match": "^harness/config/deploy-hooks\\.sh$", "label": "deploy scripts"},
+      {"match": "^\\.claude/(settings\\.json|harness-hooks\\.json)$", "label": "agent boundaries"}
+    ]
+  },
+  "scan": {
+    "_id_patterns": "Project identifiers that must never land in git, e.g. [{\"name\": \"customer id\", \"regex\": \"(?<![\\\\w.,:/#-])C\\\\d{7}(?![\\\\w.,:/-])\"}].",
+    "id_patterns": [],
+    "_name_detectors": "Built-in personal name detectors: \"uk_full_name\".",
+    "name_detectors": [],
+    "shellcheck": false,
+    "bandit": null
+  },
+  "supply_chain": {
+    "_python": "[{\"app\": \"api\", \"requirements\": \"api/requirements.txt\", \"lock\": \"api/requirements.lock.txt\"}]",
+    "python": [],
+    "_npm": "Folders with package.json, e.g. [\"web\"].",
+    "npm": [],
+    "deploy_apps": []
+  },
+  "docs": {"enabled": false},
+  "deploy_check": {
+    "_openapi_cmd": "e.g. \"{python} -c \\\"import json, sys; from app.main import app; json.dump(app.openapi(), sys.stdout)\\\"\"; null skips the API contract.",
+    "openapi_cmd": null,
+    "pythonpath": ["src"],
+    "tests_glob": "tests/test_*.py",
+    "test_cmd": "{python} {file}",
+    "env_drop": [],
+    "security_tests": []
+  }
+}

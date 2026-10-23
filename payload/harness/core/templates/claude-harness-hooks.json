@@ -1,0 +1,46 @@
+{
+  "_comment": "Project settings of the harness hooks in .claude/hooks/harness/ (installed as .claude/harness-hooks.json; Claude Code asks a human before the agent edits anything in .claude/). Every key is optional: a missing key keeps the default from the hook. Patterns are Python regexes; a backslash is written twice in JSON.",
+  "guard": {
+    "rules": {
+      "git-destructive": true,
+      "git-coauthor": true,
+      "secrets-read": true,
+      "git-push": true,
+      "outbound": true,
+      "deploy": true,
+      "repeat-budget": true
+    },
+    "_secret_dirs": "Folders that hold secrets, relative and with a trailing slash. Reading anything inside is denied, by command or with the Read tool.",
+    "secret_dirs": ["secrets/", ".secrets/"],
+    "_secret_files": "File names (regex for the whole name) that hold secrets. *.example files stay readable.",
+    "secret_files": ["[\\w.-]*\\.env", "secrets\\.env"],
+    "_deploy": "Commands that ship code to machines. The human confirms each one.",
+    "deploy": [
+      "(^|[\\s/])deploy/[\\w.-]*(sync|deploy|release)[\\w.-]*\\.sh\\b",
+      "harness/core/scripts/deploy\\.sh\\b",
+      "(^|[;&|(]\\s*|\\s)kubectl\\s+(apply|delete|replace|rollout|scale|set)\\b",
+      "(^|[;&|(]\\s*|\\s)helm\\s+(install|upgrade|uninstall|rollback)\\b",
+      "(^|[;&|(]\\s*|\\s)terraform\\s+(apply|destroy|import)\\b",
+      "(^|[;&|(]\\s*|\\s)ansible-playbook\\b",
+      "(^|[;&|(]\\s*|\\s)docker\\s+push\\b"
+    ],
+    "_internal_hosts": "Hosts inside the perimeter, one regex per host. curl, wget, scp and rsync to any other host ask the human. Add the project's servers, e.g. \"10\\\\.20\\\\.30\\\\.\\\\d+\" or \"build\\\\.corp\\\\.example\".",
+    "internal_hosts": ["127\\.0\\.0\\.1", "localhost", "0\\.0\\.0\\.0", "\\[::1\\]"],
+    "_publish": "Commands that publish content (wiki, tracker, design tool, GitHub). Add the project's publishing scripts, e.g. \"scripts/wiki/publish\\\\.sh\".",
+    "publish": [
+      "(^|[;&|(]\\s*|\\s)gh\\s+(?:pr|issue|release|gist|repo)\\s+(?:create|edit|comment|close|merge|delete)",
+      "(^|[;&|(]\\s*|\\s)gh\\s+api\\b[^;&|]*(?:-X\\s*(?:POST|PUT|PATCH|DELETE)|--method\\s+(?:POST|PUT|PATCH|DELETE)|-f\\s|--field)"
+    ],
+    "repeat_limit": 4
+  },
+  "stop": {
+    "_comment": "Fast checks of the files changed since the last clean check, before the agent finishes its answer (Stop hook). A failure sends the agent back to work with the output; at most max_blocks times in a row, then the answer ends with a warning. {files} is the matching files, {file} runs the command once per file.",
+    "enabled": true,
+    "max_blocks": 2,
+    "timeout_s": 60,
+    "checks": [
+      {"name": "syntax", "glob": ["*.py", "*.json", "*.toml", "*.sh"], "cmd": "python3 harness/core/scripts/syntax_check.py {files}"},
+      {"name": "text style", "glob": ["*.md"], "cmd": "python3 harness/core/scripts/style_check.py --scope-only {files}"}
+    ]
+  }
+}

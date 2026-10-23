@@ -1,0 +1,36 @@
+{
+  "_comment": "What the harness needs in .claude/settings.json. harness.py merges it on install and upgrade: missing entries are added, nothing of the project is removed or reordered. A hook entry is matched by its script path.",
+  "permissions": {
+    "deny": [
+      "Read(./secrets/**)",
+      "Read(./.secrets/**)",
+      "Read(**/.env)",
+      "Read(**/secrets.env)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/harness/guard.py\" || exit 2",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/harness/stop_check.py\"",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

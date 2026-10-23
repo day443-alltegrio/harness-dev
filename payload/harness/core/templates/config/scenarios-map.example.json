@@ -1,0 +1,22 @@
+{
+  "_comment": "Map for QG8 (harness/core/scripts/doc_coverage.py). Copy to scenarios-map.json and set docs.enabled in harness.json. doc - the scenarios document, one heading per scenario matching heading. Each scenario: actor (user, admin, both, or system for a pipeline without review), files (paths or globs of the code that implements it), tests (file::name). watch - globs of code that must belong to some scenario; service - files with no behaviour people see, each with a reason; shared - common modules whose change should not wake every scenario.",
+  "doc": "docs/scenarios.md",
+  "heading": "SC-\\d+",
+  "scenarios": {
+    "SC-01": {
+      "title": "Sign in",
+      "actor": "user",
+      "files": ["src/app/auth.py", "web/src/Login.tsx"],
+      "tests": ["tests/test_auth.py::test_sign_in"]
+    },
+    "SC-02": {
+      "title": "Nightly import",
+      "actor": "system",
+      "files": ["src/app/importer.py"],
+      "tests": []
+    }
+  },
+  "watch": ["src/app/*.py", "web/src/*.tsx"],
+  "service": {"src/app/health.py": "liveness probe, nothing a person sees"},
+  "shared": ["web/src/App.tsx"]
+}
