@@ -11,7 +11,7 @@ upgrade. Improve the kit instead, then upgrade.
 | `rules.md` | generic rules for the agent, imported by `CLAUDE.md` |
 | `docs/design.md` | generic design: principles, gates, boundaries, levels, entropy |
 | `docs/failure-patterns.md` | generic failure patterns and the kit checks for them |
-| `scripts/` | gate table, preflight, deploy wrapper and deploy check, scanners, budgets, snapshot |
+| `scripts/` | gate table, preflight, deploy wrapper and deploy check, scanners, budgets, snapshot, data checks, regression cases, hook review, sandbox settings, golden tasks |
 | `tests/` | tests of the kit checks, run with the project's own harness tests |
 | `templates/` | sources of the project-owned files (created once, never overwritten) |
 | `migrations/` | numbered config migrations, run once each by `harness.py upgrade` |

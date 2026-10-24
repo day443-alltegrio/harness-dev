@@ -147,18 +147,31 @@ def merged_settings(current: dict) -> tuple[dict, list[str]]:
         for entry in entries:
             for hook in entry["hooks"]:
                 script = HOOK_SCRIPT.search(hook["command"]).group(0)
-                found = None
+                name = script.rsplit("/", 1)[-1]
+                found, found_in = None, None
                 for e in have:
                     for h in e.get("hooks", []):
                         if script in h.get("command", ""):
-                            found = h
+                            found, found_in = h, e
                 if found is None:
                     have.append(json.loads(json.dumps({**entry, "hooks": [hook]})))
-                    notes.append(f"+{event} {script.rsplit('/', 1)[-1]}")
-                elif found != hook:
+                    notes.append(f"+{event} {name}")
+                    continue
+                if found != hook:
                     found.clear()
                     found.update(hook)
-                    notes.append(f"~{event} {script.rsplit('/', 1)[-1]}")
+                    notes.append(f"~{event} {name}")
+                if found_in.get("matcher") != entry.get("matcher"):
+                    # The kit decides which tools its hook sees. An entry the project
+                    # shares with its own hooks keeps them; the kit hook moves out.
+                    if len(found_in["hooks"]) == 1:
+                        found_in.pop("matcher", None)
+                        if "matcher" in entry:
+                            found_in["matcher"] = entry["matcher"]
+                    else:
+                        found_in["hooks"].remove(found)
+                        have.append(json.loads(json.dumps({**entry, "hooks": [hook]})))
+                    notes.append(f"~{event} {name} matcher")
     return out, notes
 
 

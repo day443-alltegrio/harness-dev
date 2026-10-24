@@ -69,11 +69,11 @@ Anti-goals (a failure even if it technically works):
 | Layer | Purpose | Parts in the kit |
 |---|---|---|
 | Guides (before the action) | tell the agent what is expected | `rules.md`, project rules, task contracts, skills `harness-*`, `CLAUDE.md` map |
-| Boundaries | limit what the agent may do | guard hook (deny, ask), `permissions.deny`, approvals per action |
-| Sensors (after the action) | tell the agent and people what broke | Stop hook, harness tests, preflight, commit scanner, deploy check, doc coverage, style check |
-| Feedback | turn a failure into a check | failure catalog, project incidents, coverage registry, skill `harness-incident` |
-| Entropy control | keep the harness small and true | context budget, monthly cleanup (skill `harness-cleanup`), kit file drift warning |
-| Measurement | know whether the harness works | gate table, nightly snapshot, agent telemetry, hook decision log |
+| Boundaries | limit what the agent may do | OS sandbox (opt-in, `sandbox_config.py`), `permissions.deny`, guard hook (deny, ask), ConfigChange hook, approvals per action |
+| Sensors (after the action) | tell the agent and people what broke | Stop hook, harness tests, preflight, commit scanner, deploy check, regression cases, data checks, doc coverage, style check |
+| Feedback | turn a failure into a check | failure catalog, project incidents, coverage registry, regression cases from confirmed tickets, skills `harness-incident` and `harness-regression` |
+| Entropy control | keep the harness small and true | context budget, false-block marks, monthly cleanup (skill `harness-cleanup`), kit file drift warning |
+| Measurement | know whether the harness works | gate table, nightly snapshot, agent telemetry, hook decision log with ids, golden tasks |
 
 ## 5. Gates
 
@@ -83,13 +83,13 @@ its reason). `python3 harness/core/scripts/gates.py` prints one line per gate.
 
 | Gate | When | What it checks | On failure |
 |---|---|---|---|
-| QG0 guard and Stop hooks | every Bash or Read call; the end of every answer | destructive git, secrets, push, deploy, outbound data, the same command a fourth time; syntax and style of changed files | blocked or a confirmation window; the agent goes back to work with the output |
-| QG1 quality checks | `run.sh` on demand, nightly in the snapshot | harness tests, context budget, pinned dependencies, vulnerabilities, allowed plugins and MCP servers | non-zero exit; a finding in the snapshot |
+| QG0 guard, Stop and ConfigChange hooks | every Bash, Read, Grep, Edit or Write call; the end of every answer; every settings change | destructive git, secrets read or written, keys in written text, push, deploy, outbound data, decoded or downloaded code, shell writes to the agent's settings, edits of kit files, scripts the agent wrote, read-only reviewers, the same command a fourth time; syntax and style of changed files; hooks or sandbox switched off; the hooks wired and the sandbox as configured | blocked or a confirmation window; the agent goes back to work with the output; a weakening settings change is not applied |
+| QG1 quality checks | `run.sh` on demand, nightly in the snapshot | harness tests, regression cases ("before"), context budget, pinned dependencies, vulnerabilities, allowed plugins and MCP servers | non-zero exit; a finding in the snapshot |
 | QG2 preflight | the start of every deploy, on the developer machine | committed code from the main copy and branch, lineage from the last deploy, build stamp, task contract, secrets and IDs in the added lines, critical vulnerabilities, documentation | nothing is copied; the attempt is journaled as BLOCKED |
-| QG3 deploy check | every deploy, on the target, before the code is replaced | API contract against the running code, all tests, security tests | BLOCKED, running code untouched |
+| QG3 deploy check | every deploy, on the target, before the code is replaced | API contract against the running code, all tests, security tests, regression cases ("before") | BLOCKED, running code untouched |
 | QG4 candidate on a port | before switching traffic | reference requests against a candidate instance | no switch |
-| QG5 after replacement | right after the swap | the service is up, smoke checks of the main function, code hash | a failed deploy, not a warning; rollback by deploying the previous commit |
-| QG6 data invariants | nightly and after a data run | counters: derived version equals source version, no empty outputs, false-positive counters, no sharp drops | a finding; quarantine of new data where the project has it |
+| QG5 after replacement | right after the swap | the service is up, smoke checks of the main function, regression cases ("after"), code hash | a failed deploy, not a warning; rollback by deploying the previous commit |
+| QG6 data invariants | nightly and after a data run | project counters against fixed rules (`data_checks.py`): derived version equals source version, no empty outputs, false-positive counters, no sharp drops until a human accepts the new level | a finding; quarantine of new data where the project has it |
 | QG7 nightly snapshot | nightly, read only | the snapshot's problems: tests, budgets, supply chain, secrets in history, documentation | a finding in the gate table; stale after 36 hours |
 | QG8 documentation | in preflight and nightly | scenarios of people tied to code, with tests, reviewed after each change | no deploy until a human decides (fix_doc, fix_code, defer, none) |
 
@@ -102,13 +102,16 @@ a `scan: ignore` mark with a reason next to it. Tests are never bypassed.
 ## 6. The path of a change
 
 ```
-edit by the agent  -> QG0 guard (boundaries), Stop hook (fast checks of changed files)
+edit by the agent  -> sandbox (when on), QG0 guard (boundaries), Stop hook (fast checks of changed files)
+settings change    -> ConfigChange hook: no weakening applied mid-session
 deploy             -> QG2 preflight on the developer machine, with QG8
                    -> QG3 deploy check on the target: contract, tests, security tests
                    -> swap and restart
-                   -> QG5 the service is up, smoke checks
+                   -> QG5 the service is up, smoke checks, "after" regression cases
 nightly            -> QG1 quality checks, QG6 data invariants, QG7 snapshot, QG8
 failure            -> pattern -> check at the earliest deterministic point -> test
+confirmed ticket   -> regression case, replayed on every deploy
+harness or model   -> golden tasks: the real agent on fixed tasks, compared with the last run
 ```
 
 ## 7. Security boundary
@@ -127,17 +130,31 @@ From strongest to weakest:
    but can be bypassed (a script file, base64, Python instead of ssh); Grep, Glob, Edit
    and Write are outside the guard hook.
 
-What the kit holds: the guard hook (secrets, destructive git, deploy, push, outbound
-commands with a confirmation per action), deny rules for secret files, the commit
-scanner for secrets and project IDs, secrets in the git history in the snapshot. Hook
-code and its config sit in `.claude/`, which Claude Code protects: the agent cannot
-change them without a human confirming.
+What the kit holds:
+- the sandbox, opt-in: `harness/config/sandbox.json` lists allowed domains, denied reads
+  and excluded commands, `sandbox_config.py` writes the block into `.claude/settings.json`
+  with the retry outside the sandbox closed, the gate table shows its state and the
+  ConfigChange hook keeps a required sandbox on (skill `harness-sandbox`);
+- the guard hook: secrets read by any command, interpreter one-liner, input
+  redirection, upload, move or link, with Read or Grep; secret files written and keys
+  written into files; destructive git; deploy, push and outbound commands (ssh and
+  network code included) with a confirmation per action; decoded or downloaded code;
+  shell writes to the agent's settings and edits of kit files; scripts the agent wrote
+  or changed, read before they run; read-only reviewer subagents;
+- the ConfigChange hook: a settings change that switches hooks off, unwires them,
+  narrows the guard, drops a deny rule or turns off a required sandbox is not applied;
+- deny rules for secret files, the commit scanner for secrets and project IDs, secrets
+  in the git history in the snapshot.
+Hook code and its config sit in `.claude/`, which Claude Code protects for its own
+tools; the guard covers shell writes there.
 
-What it does not hold: an agent with full rights on a server can change it past any
-confirmation, including under instructions planted in data. Before production the
-project narrows the agent's rights on servers (a deploy user, a read-only database role
-for the agent, sudoers) and switches on the sandbox with a network allowlist. Secrets
-never live in files the agent reads; scripts load them themselves.
+What it does not hold: Read, Edit, Write and WebFetch run outside the sandbox and
+answer to permission rules and the guard only; a determined program can still hide
+what it does from a text check; an agent with full rights on a server can change it
+past any confirmation, including under instructions planted in data. Before production
+the project narrows the agent's rights on servers (a deploy user, a read-only database
+role for the agent, sudoers) and turns the sandbox on with `required`. Secrets never
+live in files the agent reads; scripts load them themselves.
 
 ## 8. Context as a map
 
@@ -168,7 +185,12 @@ is expensive enough to prevent.
 
 - **A new failure becomes a rule**: classified, a check at the earliest deterministic
   point, a test that fires on it, a row in the coverage registry.
-- **A fixed ticket with a confirmed result becomes a regression test.**
+- **A fixed ticket with a confirmed result becomes a regression case**
+  (`harness/project/regressions/`, skill `harness-regression`), replayed by `run.sh`, the
+  deploy check and after the swap. A case is never edited to pass: a changed result is
+  a new human confirmation.
+- **A wrong hook decision is marked by the human who saw it**
+  (`hook_review.py mark <id> --reason ...`): the id is in every block and ask.
 - **Monthly cleanup**: hook decision log (false blocks), thresholds, rules without a
   failure behind them, agent memory, `CLAUDE.md`, skills; what is stale is deleted. The
   result is a dated line in the project decisions.
@@ -176,7 +198,8 @@ is expensive enough to prevent.
   is removed; a rule with more than 20% false blocks in a month is reviewed; context
   over 90% of its budget is cleaned; a deferred documentation decision lasts at most 90
   days.
-- **A new agent model** triggers a review of hooks, budgets and thresholds.
+- **A new agent model or a harness change** triggers the golden tasks
+  (`golden_tasks.py`) and a review of hooks, budgets and thresholds.
 - **Kit files are not edited in the project**: a generic improvement goes to
   harness-dev and comes back with an upgrade; the gate table warns about local drift.
 
@@ -189,7 +212,10 @@ the check firing; empty or stale evidence is not a pass.
 |---|---|---|
 | Failure pattern coverage | `incident-coverage.json` | every pattern without a check has a plan |
 | Harness tests | `run.sh`, QG1 | all green; each check has a firing example |
-| Hook decisions | hook log, telemetry | false blocks marked and below 20% per rule |
+| Hook decisions | hook log with ids, `hook_review.py` | false blocks marked and below 20% per rule (QG0 warns) |
+| The harness changes behaviour | golden tasks, `harness/.state/golden/` | every task passes; no task worse than the last run |
+| Human-checked behaviour holds | regression cases | all pass on every deploy |
+| Data | `data_checks.py`, QG6 | every counter passes, none stale |
 | Always-loaded context | `context_budget.py` | below 90% of the budget |
 | Contracts before the change | snapshot (`contracts`) | written before, not after |
 | Critical vulnerabilities | supply chain | 0 |
@@ -220,11 +246,12 @@ the kit `CHANGELOG.md` says what each version changes and what an upgrade needs.
 
 ## 14. Not in the kit yet
 
-A ConfigChange hook that blocks switching hooks off in local settings; marking false
-blocks in the hook log; golden tasks that measure whether a harness change helped;
-sandbox configuration with a network allowlist; schema snapshot and versioned
-migrations in the deploy check; replay of closed tickets as regression tests; nightly
-data invariants as a kit check; server-side least privilege templates.
+Schema snapshot and versioned migrations in the deploy check (A2); a preflight check
+that no long job is running (A7); server-side least privilege templates; stack presets
+for the Stop checks (ruff F, tsc, go vet); an AGENTS.md export for other agents.
+Behaviour and the understanding of a task still have no sensor of their own: golden
+tasks, regression cases and checkable acceptance criteria make what people decided and
+confirmed durable, they do not replace the people.
 
 ## Glossary
 
@@ -233,7 +260,11 @@ data invariants as a kit check; server-side least privilege templates.
 - **Deterministic check** - one that always gives the same result on the same input
   (a test, a rule, a counter).
 - **Fingerprint** - a short checksum of code or text at the moment of a review.
+- **False block** - a hook decision a human marked as wrong; the share per rule says
+  whether the rule is too broad.
 - **Gate (QG)** - a point of the process where a check can stop a change or data.
+- **Golden task** - a fixed task the real agent does in a throwaway worktree, graded by a
+  deterministic check; measures the harness, not the code.
 - **Guide** - feedforward control: rules, contracts, skills.
 - **Hook** - a command Claude Code runs on an event; it can block the agent's action.
 - **Inferential check** - one where a model or a reviewer subagent decides; more
@@ -241,5 +272,8 @@ data invariants as a kit check; server-side least privilege templates.
 - **Kit-owned file** - a file harness-dev installs and replaces on upgrade.
 - **Lethal trifecta** - private data, untrusted content and a way out, together.
 - **Project-owned file** - a file created once from a template and owned by the project.
+- **Regression case** - a command and the result a human confirmed when a ticket closed.
+- **Sandbox** - the operating system boundary of Claude Code for Bash commands: network
+  through an allowlist proxy, writes in allowed folders.
 - **Sensor** - feedback control: tests, scanners, hooks, gates.
 - **Stop hook** - a hook that runs before the agent ends its answer.

@@ -8,11 +8,11 @@ description: Monthly entropy pass over the harness - false blocks in the hook lo
 Goal: the harness stays small and true. Delete what no longer earns its place; do not
 add rules in this pass unless a failure demands it. Numbers only in the report.
 
-1. **Hook decisions.** Count decisions per rule over the month from
-   `.claude/hooks/harness/log/*.jsonl` (`python3 harness/core/scripts/agent_metrics.py --days 31`).
-   For each rule with asks or blocks, sample the cases with the user: how many were
-   false? A rule over 20% false gets a narrower pattern or is removed (project patterns
-   in `.claude/harness-hooks.json`; kit patterns via a note for harness-dev).
+1. **Hook decisions.** `python3 harness/core/scripts/hook_review.py report --days 31`:
+   decisions and marked false blocks per rule. Go through the unmarked asks and blocks
+   with the user (`hook_review.py list --days 31`) and mark the false ones by id. A rule
+   over 20% false gets a narrower pattern or is removed (project patterns in
+   `.claude/harness-hooks.json`; kit patterns via a note for harness-dev).
 2. **Rules without failures.** For every project rule, check, test and Stop check: which
    failure is it for (`harness/project/incidents.md`, registry)? None, and nothing
    caught in 6 months: propose removal.
@@ -25,7 +25,11 @@ add rules in this pass unless a failure demands it. Numbers only in the report.
 5. **Kit.** `python3 <harness-dev>/harness.py status .`: local drift in kit files is
    either moved to harness-dev or reverted by an upgrade; if the kit is ahead, plan the
    upgrade (skill `harness-upgrade`).
-6. **Agent model.** If the model changed since the last pass, review hooks, budgets and
-   thresholds against the new behaviour.
-7. Record a dated line in `harness/project/design.md`, "Decisions": what was removed,
+6. **Agent model.** If the model or the harness changed since the last pass, run the
+   golden tasks with the user's "yes" (they call the model:
+   `python3 harness/core/scripts/golden_tasks.py`) and compare with the last run; then
+   review hooks, budgets and thresholds against the new behaviour.
+7. **Evidence.** Data checks ran within `stale_hours` (QG6), regression cases pass, the
+   sandbox state is as `harness/config/sandbox.json` says.
+8. Record a dated line in `harness/project/design.md`, "Decisions": what was removed,
    narrowed, cleaned, and the budget numbers before and after. End with the gate report.

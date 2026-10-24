@@ -40,7 +40,14 @@ Find and note, with the file that proves each fact:
   set limits with about 20% headroom.
 - `harness/config/style.json`: scope (human-facing docs), excluded folders, languages.
 - `harness/config/gates.json`: active only what runs now; for the rest the reason.
-- `harness/config/deploy-hooks.sh`: only if the user wants the gated deploy now.
+- `harness/config/deploy-hooks.sh`: only if the user wants the gated deploy now; run the
+  "after" regression cases in `deploy_health`.
+- `harness/config/data-checks.json`: counters for the project's data (the `_examples`
+  show one per pattern), when the project has data pipelines; then QG6 goes active.
+- `harness/config/sandbox.json`: leave it off unless the user decides now (skill
+  `harness-sandbox`); record the decision in `harness/project/design.md`.
+- `harness/config/golden-tasks.json`: the generic tasks stay; add the project's own when
+  a behaviour matters enough to measure with the real agent.
 
 ## 3. Write the project parts
 
@@ -60,5 +67,5 @@ the gate table as is, name every non-pass gate and why.
 ## 5. Hand over
 
 Do not commit without the user's "yes". Propose the commit message in the project's
-format and list what the user must still decide (deploy hooks, nightly snapshot,
-scenarios map, sandbox).
+format and list what the user must still decide (deploy hooks, nightly snapshot and
+data checks, scenarios map, sandbox, the first golden run).

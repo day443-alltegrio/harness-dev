@@ -20,6 +20,9 @@ settings in deploy_check of harness.json). Checks:
    variables that switch tests to live databases (env_drop).
 3. Security tests (security_tests): the same runs, reported separately; a missing one
    is a failure too.
+4. Regression cases (regressions.py, "before" ones): closed tickets whose result a
+   human confirmed, replayed on the new code from the root of the staged copy. None
+   recorded is not a stop; a failed or malformed case is.
 
 Result: one JSON line on stdout (the deploy journal stores it) and the exit code:
 0 - may deploy, 1 - stopped, 2 - the check itself failed. Nothing is changed: no code,
@@ -300,8 +303,19 @@ def run_tests(root: Path, conf: dict) -> list[dict]:
 # Verdict
 # ---------------------------------------------------------------------------
 
+def replay(repo_root: Path, staged: Path, conf: dict) -> dict:
+    """The "before" regression cases on the new code; counts and ids only."""
+    import regressions  # noqa: PLC0415
+    try:
+        out = regressions.run(repo_root, "before", env=_env(staged, conf))
+    except ValueError as err:
+        return {"cases": 0, "error": "regression cases malformed: " + str(err).splitlines()[0][:200]}
+    return {"cases": out["cases"], "passed": out["passed"], "failed": out["failed"],
+            "errors": out["errors"]}
+
+
 def verdict(contract: dict, tests: list[dict], allow_breaking: str | None,
-            security: tuple[str, ...]) -> dict:
+            security: tuple[str, ...], regressions: dict | None = None) -> dict:
     reasons = []
     if contract.get("error"):
         reasons.append(f"contract not checked: {contract['error']}")
@@ -321,18 +335,25 @@ def verdict(contract: dict, tests: list[dict], allow_breaking: str | None,
     missing = [s for s in security if s not in {t["file"] for t in tests}]
     if missing:
         reasons.append("security tests missing: " + ", ".join(missing))
+    reg = regressions or {}
+    if reg.get("error"):
+        reasons.append(reg["error"])
+    bad = list(reg.get("failed") or []) + list(reg.get("errors") or [])
+    if bad:
+        reasons.append("regression cases failed: " + ", ".join(bad))
     return {"verdict": "blocked" if reasons else "pass", "reasons": reasons}
 
 
 def summary(contract: dict, tests: list[dict], allow_breaking: str | None,
-            security: tuple[str, ...]) -> dict:
+            security: tuple[str, ...], regressions: dict | None = None) -> dict:
     """Short report for the deploy journal, without the output of passing tests."""
     changes = contract.get("changes", [])
     breaking = [c for c in changes if c["kind"] == "breaking"]
     sec = [t for t in tests if t["file"] in security]
     return {
         "agent": AGENT,
-        **verdict(contract, tests, allow_breaking, security),
+        **verdict(contract, tests, allow_breaking, security, regressions),
+        "regressions": regressions or {"cases": 0, "skipped": True},
         "contract": {
             "baseline": contract.get("baseline"),
             "operations": contract.get("operations"),
@@ -350,7 +371,7 @@ def summary(contract: dict, tests: list[dict], allow_breaking: str | None,
 
 
 def check(staged: Path, current: Path | None, allow_breaking: str | None,
-          conf: dict | None = None) -> dict:
+          conf: dict | None = None, repo_root: Path | None = None) -> dict:
     conf = conf or settings()
     began = time.monotonic()
     staged = staged.resolve()
@@ -369,7 +390,9 @@ def check(staged: Path, current: Path | None, allow_breaking: str | None,
             contract["error"] = f"{type(err).__name__}: {err}"[:500]
     security = tuple(conf["security_tests"])
     tests = run_tests(staged, conf)
-    out = summary(contract, tests, allow_breaking, security)
+    # The cases live in the repository: the root of the staged copy this script runs from.
+    reg = replay(repo_root or harness_config.ROOT, staged, conf) if conf.get("regressions", True) else None
+    out = summary(contract, tests, allow_breaking, security, reg)
     out["took_s"] = round(time.monotonic() - began, 1)
     return out
 

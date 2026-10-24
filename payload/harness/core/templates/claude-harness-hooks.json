@@ -11,7 +11,7 @@
       "repeat-budget": true
     },
     "_secret_dirs": "Folders that hold secrets, relative and with a trailing slash. Reading anything inside is denied, by command or with the Read tool.",
-    "secret_dirs": ["secrets/", ".secrets/"],
+    "secret_dirs": ["secrets/", ".secrets/", ".ssh/", ".aws/", ".gnupg/"],
     "_secret_files": "File names (regex for the whole name) that hold secrets. *.example files stay readable.",
     "secret_files": ["[\\w.-]*\\.env", "secrets\\.env"],
     "_deploy": "Commands that ship code to machines. The human confirms each one.",

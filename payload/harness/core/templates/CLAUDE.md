@@ -23,6 +23,7 @@ imported below; project rules are in `harness/project/rules.md`.
 | Build | `<command>` |
 | Deploy | `sh harness/core/scripts/deploy.sh -m "[*] what changed"` (after a commit and the user's "yes") |
 | Harness checks | `sh harness/core/scripts/run.sh` |
+| Mark a wrong hook decision | `python3 harness/core/scripts/hook_review.py mark <id> --reason "..."` |
 | Gate report | `python3 harness/core/scripts/gates.py` |
 | Text style | `python3 harness/core/scripts/style_check.py [file]` |
 

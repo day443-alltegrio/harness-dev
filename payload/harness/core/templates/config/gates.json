@@ -1,14 +1,54 @@
 {
- "_comment": "State of each quality gate (harness/core/docs/design.md, section 4). active - runs and shows its result; in_progress - being built, shown with its reason; disabled - switched off as a conscious trade-off, shown with its reason. check names a built-in check of harness/core/scripts/gates.py (hook_log, quality, preflight, deploy_report, snapshot, docs) or use command with any shell command. A gate moves to active in the same change that wires it.",
+ "_comment": "State of each quality gate (harness/core/docs/design.md, section 4). active - runs and shows its result; in_progress - being built, shown with its reason; disabled - switched off as a conscious trade-off, shown with its reason. check names a built-in check of harness/core/scripts/gates.py (hook_log, quality, preflight, deploy_report, snapshot, docs, data) or use command with any shell command. A gate moves to active in the same change that wires it.",
  "gates": {
-  "QG0": {"name": "guard hook", "state": "active", "check": "hook_log"},
-  "QG1": {"name": "quality checks", "state": "active", "check": "quality"},
-  "QG2": {"name": "preflight", "state": "active", "check": "preflight"},
-  "QG3": {"name": "deploy check", "state": "in_progress", "check": "deploy_report", "reason": "in progress: fill harness/config/deploy-hooks.sh, then deploy through harness/core/scripts/deploy.sh"},
-  "QG4": {"name": "candidate on a port", "state": "disabled", "reason": "trade-off: one service, the deploy check catches the main failures before the swap"},
-  "QG5": {"name": "after replacement", "state": "in_progress", "reason": "in progress: deploy_health with a smoke check; no auto rollback yet"},
-  "QG6": {"name": "data invariants", "state": "in_progress", "reason": "in progress: nightly counters of the data pipelines"},
-  "QG7": {"name": "nightly snapshot", "state": "in_progress", "check": "snapshot", "reason": "in progress: schedule harness/core/scripts/snapshot.py nightly"},
-  "QG8": {"name": "documentation", "state": "in_progress", "check": "docs", "reason": "in progress: scenarios document and harness/config/scenarios-map.json"}
+  "QG0": {
+   "name": "guard hook",
+   "state": "active",
+   "check": "hook_log"
+  },
+  "QG1": {
+   "name": "quality checks",
+   "state": "active",
+   "check": "quality"
+  },
+  "QG2": {
+   "name": "preflight",
+   "state": "active",
+   "check": "preflight"
+  },
+  "QG3": {
+   "name": "deploy check",
+   "state": "in_progress",
+   "check": "deploy_report",
+   "reason": "in progress: fill harness/config/deploy-hooks.sh, then deploy through harness/core/scripts/deploy.sh"
+  },
+  "QG4": {
+   "name": "candidate on a port",
+   "state": "disabled",
+   "reason": "trade-off: one service, the deploy check catches the main failures before the swap"
+  },
+  "QG5": {
+   "name": "after replacement",
+   "state": "in_progress",
+   "reason": "in progress: deploy_health with a smoke check; no auto rollback yet"
+  },
+  "QG6": {
+   "name": "data invariants",
+   "state": "in_progress",
+   "check": "data",
+   "reason": "in progress: project counters in harness/config/data-checks.json, run nightly by data_checks.py"
+  },
+  "QG7": {
+   "name": "nightly snapshot",
+   "state": "in_progress",
+   "check": "snapshot",
+   "reason": "in progress: schedule harness/core/scripts/snapshot.py nightly"
+  },
+  "QG8": {
+   "name": "documentation",
+   "state": "in_progress",
+   "check": "docs",
+   "reason": "in progress: scenarios document and harness/config/scenarios-map.json"
+  }
  }
 }

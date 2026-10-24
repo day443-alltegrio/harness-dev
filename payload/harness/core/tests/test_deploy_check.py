@@ -186,6 +186,29 @@ class Run(unittest.TestCase):
             del os.environ["LIVE_DSN"]
         self.assertEqual(out["verdict"], "pass")
 
+    def test_regression_cases_replay_on_the_new_code(self):
+        code = self.code({"test_ok.py": "pass\n"})
+        repo = Path(tempfile.mkdtemp())
+        out = dc.check(code, None, None, self.conf(), repo_root=repo)
+        self.assertEqual((out["verdict"], out["regressions"]["cases"]), ("pass", 0))
+        cases = repo / harness_config.DEFAULTS["regressions"]["dir"]
+        cases.mkdir(parents=True)
+        case = {"id": "R-0001", "ticket": "T-1", "confirmed": {"by": "QA", "date": "2026-10-22"},
+                "cmd": "echo 41", "expect": {"number": 42}}
+        (cases / "R-0001-x.json").write_text(json.dumps(case))
+        out = dc.check(code, None, None, self.conf(), repo_root=repo)
+        self.assertEqual(out["verdict"], "blocked")
+        self.assertIn("regression cases failed: R-0001", out["reasons"])
+        (cases / "R-0001-x.json").write_text(json.dumps({**case, "cmd": "echo 42"}))
+        out = dc.check(code, None, None, self.conf(), repo_root=repo)
+        self.assertEqual((out["verdict"], out["regressions"]["passed"]), ("pass", 1))
+        (cases / "R-0002-y.json").write_text("{not json")
+        out = dc.check(code, None, None, self.conf(), repo_root=repo)
+        self.assertEqual(out["verdict"], "blocked")
+        self.assertTrue(any("malformed" in r for r in out["reasons"]))
+        out = dc.check(code, None, None, self.conf(regressions=False), repo_root=repo)
+        self.assertEqual(out["verdict"], "pass")
+
     def test_contract_against_current_code(self):
         new = self.code({"test_ok.py": "pass\n"})
         cur = self.code({"test_ok.py": "pass\n"})

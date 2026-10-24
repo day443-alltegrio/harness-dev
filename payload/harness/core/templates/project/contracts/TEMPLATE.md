@@ -21,7 +21,10 @@ What this change deliberately does not do.
 ## Acceptance criteria
 
 What proves it is done: which tests, quality checks, reference cases, a check on the
-live system. Only what can be checked.
+live system. Only what can be checked. Name each check in backticks: a test
+(`test_name`), a command (`sh harness/core/scripts/run.sh`) or a regression case
+(`R-0001`); preflight checks that the named tests and cases exist, and a contract in
+state "done" names at least one.
 
 ## Boundaries
 

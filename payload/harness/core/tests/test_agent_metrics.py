@@ -42,9 +42,13 @@ class Metrics(unittest.TestCase):
         sub = proj / "s1" / "subagents"
         sub.mkdir(parents=True)
         (sub / "a.jsonl").write_text(bash_use("ls", "m9"), encoding="utf-8")
-        (hooks / "x.jsonl").write_text(json.dumps({"ts": NOW.strftime("%Y-%m-%dT%H:%M:%S"),
-                                                   "rule": "git-destructive",
-                                                   "decision": "deny"}), encoding="utf-8")
+        rec = {"ts": NOW.strftime("%Y-%m-%dT%H:%M:%S"), "rule": "git-destructive", "decision": "deny"}
+        (hooks / f"{NOW.date().isoformat()}.jsonl").write_text(
+            json.dumps({**rec, "id": "a1"}) + "\n" + json.dumps({**rec, "id": "a2"}), encoding="utf-8")
+        # Not a day log: never counted.
+        (hooks / "notes.jsonl").write_text(json.dumps(rec), encoding="utf-8")
+        (hooks / "marks").mkdir()
+        (hooks / "marks" / "false-blocks.jsonl").write_text(json.dumps({"id": "a2", "verdict": "false"}))
         return am.collect(proj, hooks, 2)
 
     def test_counts(self):
@@ -58,7 +62,8 @@ class Metrics(unittest.TestCase):
         self.assertEqual(day["compactions"], 1)
         self.assertEqual(day["repeat_streaks"], 1)
         self.assertEqual(day["tokens"]["input_tokens"], 40)  # m1, m2, m3, m9, no m1 twice
-        self.assertEqual(day["hook_blocks"], {"git-destructive:deny": 1})
+        self.assertEqual(day["hook_blocks"], {"git-destructive:deny": 2})
+        self.assertEqual(day["false_blocks"], {"git-destructive": 1})
 
     def test_no_text_leaks(self):
         out = json.dumps(self.build(), ensure_ascii=False)

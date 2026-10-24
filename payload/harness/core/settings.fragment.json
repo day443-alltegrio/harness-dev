@@ -11,7 +11,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Read",
+        "matcher": "Bash|Read|Grep|Edit|MultiEdit|Write|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -28,6 +28,17 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/harness/stop_check.py\"",
             "timeout": 180
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/harness/config_guard.py\" || exit 2",
+            "timeout": 10
           }
         ]
       }

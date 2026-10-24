@@ -69,6 +69,41 @@ class Contracts(unittest.TestCase):
     def test_full_contract_passes(self):
         self.assertEqual(cc.contract_problems(self.root(FULL), [CDIR + "2026-10-21-x.md"]), [])
 
+    def contract(self, state: str, criteria: str) -> str:
+        body = {s: "text" for s in SECTIONS}
+        body["## Acceptance criteria"] = criteria
+        return f"# Contract: x\n\n- State: {state}\n\n" + "\n".join(f"{s}\n\n{v}\n" for s, v in body.items())
+
+    def test_done_contract_names_a_check(self):
+        files = [CDIR + "2026-10-21-x.md"]
+        root = self.root(self.contract("done", "It works well."))
+        self.assertTrue(any("name no check" in p for p in cc.contract_problems(root, files)))
+        root = self.root(self.contract("done", "`sh harness/core/scripts/run.sh` is green."))
+        self.assertEqual(cc.contract_problems(root, files), [])
+        root = self.root(self.contract("plan", "It works well."))
+        self.assertEqual(cc.contract_problems(root, files), [])
+
+    def test_named_tests_and_cases_must_exist(self):
+        files = [CDIR + "2026-10-21-x.md"]
+        root = self.root(self.contract("done", "`test_real` and `test_ghost` pass; case `R-0042` holds."))
+        (root / "tests").mkdir()
+        (root / "tests" / "test_a.py").write_text("def test_real():\n    pass\n")
+        problems = cc.contract_problems(root, files)
+        self.assertEqual(len(problems), 2, problems)
+        self.assertTrue(any("test_ghost" in p for p in problems))
+        self.assertTrue(any("R-0042" in p for p in problems))
+        cases = root / harness_config.DEFAULTS["regressions"]["dir"]
+        cases.mkdir(parents=True)
+        (cases / "R-0042-x.json").write_text('{"id": "R-0042"}')
+        (root / "tests" / "test_b.py").write_text("def test_ghost():\n    pass\n")
+        self.assertEqual(cc.contract_problems(root, files), [])
+
+    def test_checkable_can_be_switched_off(self):
+        root = self.root(self.contract("done", "`test_ghost` passes."))
+        (root / "harness" / "config").mkdir(parents=True)
+        (root / "harness" / "config" / "harness.json").write_text(json.dumps({"contracts": {"checkable": False}}))
+        self.assertEqual(cc.contract_problems(root, [CDIR + "2026-10-21-x.md"]), [])
+
     def test_template_is_not_a_contract(self):
         self.assertTrue(cc.contract_problems(self.root(None), [CDIR + "TEMPLATE.md"]))
 

@@ -3,8 +3,9 @@
 #   1. tests of harness.py (install, upgrade, status on temporary repositories);
 #   2. a fresh install into a temporary git repository, where the kit tests, run.sh
 #      and the gate table must work as in a real project;
-#   3. the style check over the kit documents (research/sources/ is verbatim material).
-#   sh check.sh
+#   3. the style check over the kit documents (research/sources/ is verbatim material);
+#   4. with --evidence: the live run and the mutation check of research/evidence/.
+#   sh check.sh [--evidence]
 set -u
 cd "$(dirname "$0")" || exit 2
 KIT=$(pwd)
@@ -26,6 +27,15 @@ echo "(QG2 fails here until the adoption contract exists: that is the point)"
 echo "== style of the kit documents"
 python3 "$WORK/harness/core/scripts/style_check.py" --config "$WORK/harness/config/style.json" \
   README.md ADOPT.md CLAUDE.md CHANGELOG.md research/README.md research/harness-engineering.md \
-  research/case-study-pilot.md research/reviews extras/claude-context/README.md prompts payload/harness/core/docs \
+  research/case-study-pilot.md research/evidence.md research/reviews extras/claude-context/README.md prompts payload/harness/core/docs \
   payload/harness/core/rules.md payload/harness/core/templates payload/.claude || rc=1
+
+if [ "${1:-}" = "--evidence" ]; then
+  echo "== live run"
+  OUT=$(python3 research/evidence/live_run.py 2>&1) || rc=1
+  printf '%s\n' "$OUT" | tail -3
+  echo "== mutation check"
+  OUT=$(python3 research/evidence/mutation_check.py 2>&1) || rc=1
+  printf '%s\n' "$OUT" | grep -E "SURVIVED|NOT APPLIED|^mutants:"
+fi
 exit $rc

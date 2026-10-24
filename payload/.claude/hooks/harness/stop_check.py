@@ -15,6 +15,7 @@ stop-check), never the file contents.
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import os
 import shlex
@@ -108,14 +109,17 @@ def session_start(transcript: str | None) -> float:
     return time.time() - 3600
 
 
-def log(event: dict, decision: str) -> None:
+def log(event: dict, decision: str) -> str:
+    """Append the decision to the hook log; returns its id (for a false-block mark)."""
     log_dir = HOOKS / "log"
     log_dir.mkdir(parents=True, exist_ok=True)
+    did = hashlib.sha256(f"{time.time_ns()}|{event.get('session_id')}".encode()).hexdigest()[:8]
     rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "tool": "Stop",
            "agent": event.get("agent_type") or "main", "rule": "stop-check",
-           "decision": decision, "session": event.get("session_id")}
+           "decision": decision, "session": event.get("session_id"), "id": did}
     with open(log_dir / f"{time.strftime('%Y-%m-%d')}.jsonl", "a", encoding="utf-8") as out:
         out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return did
 
 
 def handle(event: dict, root: Path = ROOT, conf: dict | None = None) -> dict | None:
@@ -143,10 +147,10 @@ def handle(event: dict, root: Path = ROOT, conf: dict | None = None) -> dict | N
         return {"systemMessage": f"Stop checks still fail after {blocks} rounds: "
                                  + "; ".join(f.splitlines()[0] for f in failures)}
     sp.write_text(json.dumps({"since": since, "blocks": blocks + 1}), encoding="utf-8")
-    log(event, "block")
+    did = log(event, "block")
     return {"decision": "block",
-            "reason": "Fast checks failed on the files you changed; fix them before finishing:\n"
-                      + "\n".join(failures)}
+            "reason": f"[stop-check #{did}] Fast checks failed on the files you changed; fix them "
+                      "before finishing:\n" + "\n".join(failures)}
 
 
 def main() -> int:

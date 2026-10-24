@@ -15,6 +15,7 @@ Checks a gate can use ("check" in gates.json):
   snapshot       - the last nightly snapshot (harness/.state/snapshot.json), its
                    "problems" list;
   docs           - scenarios of people against the code (doc_coverage.py);
+  data           - the last recorded run of the data checks (data_checks.py, QG6);
   command        - any shell command ("command" key): exit 0 passes, the last output
                    line is the detail.
 
@@ -53,7 +54,46 @@ def _stale_hours() -> int:
     return int(harness_config.load()["stale_hours"])
 
 
+def hook_wiring(root: Path | None = None) -> str | None:
+    """Why the hooks cannot run, or None: not wired in the project settings, or
+    switched off by disableAllHooks at any settings level of this machine."""
+    root = root or ROOT
+    files = [root / ".claude" / "settings.json", root / ".claude" / "settings.local.json",
+             Path.home() / ".claude" / "settings.json"]
+    for f in files:
+        with contextlib.suppress(OSError, ValueError):
+            if json.loads(f.read_text(encoding="utf-8")).get("disableAllHooks"):
+                return f"hooks are switched off: disableAllHooks in {f.name} ({f.parent})"
+    try:
+        settings = json.loads(files[0].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "no readable .claude/settings.json: the hooks are not wired"
+    commands = [h.get("command", "") for entries in (settings.get("hooks") or {}).values()
+                for e in entries for h in e.get("hooks", [])]
+    missing = [s for s in ("guard.py", "stop_check.py", "config_guard.py")
+               if not any(f".claude/hooks/harness/{s}" in c for c in commands)]
+    if missing:
+        return f"not wired in .claude/settings.json: {', '.join(missing)} (harness.py upgrade restores it)"
+    return None
+
+
+def sandbox_state() -> tuple[bool, str]:
+    """(in order, a short note) from harness/config/sandbox.json and the settings."""
+    import sandbox_config  # noqa: PLC0415
+    try:
+        ok, line = sandbox_config.check(ROOT)
+    except (ValueError, OSError) as err:
+        return False, f"sandbox config unreadable: {err}"
+    return ok, line
+
+
 def hook_log(gate: dict) -> tuple[str, str]:
+    broken = hook_wiring()
+    if broken:
+        return "fail", broken
+    sandbox_ok, sandbox_note = sandbox_state()
+    if not sandbox_ok:
+        return "fail", sandbox_note
     log = harness_config.HOOK_LOG / f"{dt.date.today().isoformat()}.jsonl"
     if not log.is_file():
         # No log is no evidence: the hook may not have run at all (B10).
@@ -66,7 +106,16 @@ def hook_log(gate: dict) -> tuple[str, str]:
     deny = sum(n for (dec, _), n in seen.items() if dec in ("deny", "block"))
     ask = sum(n for (dec, _), n in seen.items() if dec == "ask")
     top = ", ".join(f"{r} {n}" for (_, r), n in seen.most_common(3))
-    return "pass", f"today: {deny} blocked, {ask} asked ({top})"
+    detail = f"today: {deny} blocked, {ask} asked ({top}); {sandbox_note}"
+    import hook_review  # noqa: PLC0415
+    conf = harness_config.load()["hooks"]
+    rep = hook_review.report(harness_config.HOOK_LOG, int(conf["window_days"]),
+                             float(conf["false_block_share"]), int(conf["false_block_min"]))
+    detail += f"; {rep['window_days']} days: {rep['false']} of {rep['decisions']} marked false"
+    if rep["over"]:
+        return "warn", (detail + f"; over {rep['share_limit'] * 100:.0f}%: {', '.join(rep['over'])}"
+                        " (review the rule)")
+    return "pass", detail
 
 
 def quality(gate: dict) -> tuple[str, str]:
@@ -77,16 +126,30 @@ def quality(gate: dict) -> tuple[str, str]:
         return "fail", "no harness tests found (B10: an empty check is a failure)"
     over = [r["name"] for r in context_budget.measure() if not r["ok"]]
     pins = supply_chain.check_pins() + supply_chain.check_plugins()
+    reg, reg_note = regressions_before()
     found = ([f"{bad} of {run} tests fail"] if bad else []) \
-        + [f"context over budget: {n}" for n in over] + pins
+        + [f"context over budget: {n}" for n in over] + pins + reg
     if found:
         return "fail", _short(found)
     drift = core_drift()
     if drift:
-        return "warn", (f"tests {run}/{run}, but {len(drift)} kit files changed locally"
+        return "warn", (f"tests {run}/{run}{reg_note}, but {len(drift)} kit files changed locally"
                         f" ({_short(drift, 1)}): move the change to the kit, or the next"
                         " upgrade keeps it as a conflict")
-    return "pass", f"tests {run}/{run}, context in budget, pins and plugins ok"
+    return "pass", f"tests {run}/{run}{reg_note}, context in budget, pins and plugins ok"
+
+
+def regressions_before() -> tuple[list[str], str]:
+    """Problems and a note for the gate line from the "before" regression cases."""
+    import regressions  # noqa: PLC0415
+    try:
+        out = regressions.run(ROOT, "before")
+    except ValueError as err:
+        return ["regression cases malformed: " + str(err).splitlines()[0][:120]], ""
+    bad = out["failed"] + out["errors"]
+    if bad:
+        return [f"regression cases failed: {', '.join(bad)}"], ""
+    return [], (f", regressions {out['passed']}/{out['cases']}" if out["cases"] else ", no regression cases yet")
 
 
 def core_drift() -> list[str]:
@@ -121,6 +184,9 @@ def deploy_report(gate: dict) -> tuple[str, str]:
         parts.append(f"tests {tests.get('passed')}/{tests.get('files')}")
     if sec.get("required"):
         parts.append(f"security {sec.get('passed')}/{len(sec['required'])}")
+    reg = rep.get("regressions") or {}
+    if reg.get("cases"):
+        parts.append(f"regressions {reg.get('passed')}/{reg['cases']}")
     state = "pass" if rep.get("verdict") == "pass" else "fail"
     if state == "fail" and rep.get("reasons"):
         parts.append(_short(list(rep["reasons"]), 1))
@@ -128,6 +194,32 @@ def deploy_report(gate: dict) -> tuple[str, str]:
         state = "warn"
         parts.append(f"stale: older than {_stale_hours()} h")
     return state, ", ".join(parts)
+
+
+def data(gate: dict) -> tuple[str, str]:
+    """QG6 from the last recorded run of data_checks.py (the checks themselves can take
+    minutes, so the gate reads their evidence instead of running them)."""
+    import data_checks  # noqa: PLC0415
+    try:
+        names = {c["id"] for c in data_checks.load_checks(ROOT)}
+    except ValueError as err:
+        return "fail", f"data checks config: {str(err).splitlines()[0][:120]}"
+    rep = data_checks.last_report(ROOT)
+    if not names:
+        return "fail", "no data checks configured (B10: an empty check is not a pass)"
+    if not rep:
+        return "unknown", "no recorded run of harness/core/scripts/data_checks.py yet"
+    ran = {c["id"] for c in rep.get("checks") or []}
+    bad = [f"{c['id']} {c['detail']}" for c in rep.get("checks") or [] if c.get("state") != "pass"]
+    if bad:
+        return "fail", _short(bad)
+    if names - ran:
+        return "warn", f"never run: {', '.join(sorted(names - ran))}"
+    path = STATE / "data-checks.json"
+    s = rep.get("summary") or {}
+    if path.is_file() and _age_hours(path) > _stale_hours():
+        return "warn", f"{s.get('passed')}/{s.get('total')} passed, stale: older than {_stale_hours()} h"
+    return "pass", f"{s.get('passed')}/{s.get('total')} data checks passed"
 
 
 def snapshot(gate: dict) -> tuple[str, str]:
@@ -165,7 +257,7 @@ def command(gate: dict) -> tuple[str, str]:
 
 CHECKS = {"hook_log": hook_log, "quality": quality, "preflight": preflight,
           "deploy_report": deploy_report, "snapshot": snapshot, "docs": docs,
-          "command": command}
+          "data": data, "command": command}
 
 
 def rows(conf_path: Path | None = None) -> list[tuple[str, str, str, str]]:

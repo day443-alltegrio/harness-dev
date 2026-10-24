@@ -16,7 +16,9 @@ identifiers or secrets in anything this skill writes.
    class of failure, not the one case.
 3. **Pick the earliest deterministic point**, in this order: guard or Stop hook
    (`.claude/harness-hooks.json`), a project test run by QG1, preflight, the deploy
-   check, a pipeline counter, the nightly snapshot. An inferential check (a reviewer
+   check, a data check (`harness/config/data-checks.json`, for data failures), the
+   nightly snapshot. A behaviour a person confirmed becomes a regression case (skill
+   `harness-regression`). An inferential check (a reviewer
    subagent) only where no deterministic one is possible.
 4. **Write the test first.** In `harness/project/tests/test_project_<topic>.py`: one
    case reproducing the failure (the check fires) and one clean case (it stays

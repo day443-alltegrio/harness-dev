@@ -1,0 +1,16 @@
+{
+  "_comment": "The operating system sandbox for the agent's Bash commands (harness/core/scripts/sandbox_config.py writes it into .claude/settings.json; skill harness-sandbox walks through it). Off until the project lists what its work needs from the network: allowed_domains starts with code hosting and package registries; sandbox_config.py --suggest lists the hosts the agent used. Retrying a command outside the sandbox is always closed. Paths: ~/ is the home folder, ./ the project root. Turning it on or changing it is a change of the agent's boundaries: a task contract and a human yes.",
+  "enabled": false,
+  "_required": "true: Claude Code refuses to start when the sandbox cannot run (failIfUnavailable), and the ConfigChange hook blocks switching it off.",
+  "required": false,
+  "allowed_domains": ["github.com", "api.github.com", "codeload.github.com", "pypi.org",
+                      "files.pythonhosted.org", "registry.npmjs.org"],
+  "denied_domains": [],
+  "_deny_read": "Credentials of the machine. Add the project's secret folders (\"./secrets/\") when no script the agent runs needs them; a deploy script that loads secrets then runs outside the agent or as an excluded command.",
+  "deny_read": ["~/.ssh", "~/.aws", "~/.config/gcloud", "~/.kube/config", "~/.netrc",
+                "~/.docker/config.json", "~/.git-credentials"],
+  "allow_write": [],
+  "_excluded_commands": "Commands that run outside the sandbox, with the full rights of the user (e.g. \"docker compose *\"): only tools that cannot work inside it.",
+  "excluded_commands": [],
+  "auto_allow_bash": true
+}

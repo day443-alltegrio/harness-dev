@@ -26,5 +26,8 @@ ask the user for it.
    have defaults; adding them is optional unless an upgrade note says otherwise).
 7. Run `sh harness/core/scripts/run.sh --offline` and
    `python3 harness/core/scripts/gates.py`; fix project settings, never kit files.
+   New or changed hooks load when Claude Code restarts: ask the user to restart.
+   After a version that changes hooks or rules, offer a golden run (it calls the
+   model): `python3 harness/core/scripts/golden_tasks.py`.
 8. Do not commit without the user's "yes"; propose the message, e.g.
    `infra` / `[*] harness 0.1.0 -> 0.2.0: <the main changes>`.

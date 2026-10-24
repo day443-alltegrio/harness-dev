@@ -6,6 +6,8 @@ here.
 
 | File | What |
 |---|---|
+| `evidence.md` | what the kit does and the evidence for the current version: kit tests, the live run, the mutation check, golden tasks with the real agent, the practices it follows and its limits |
+| `evidence/` | the scripts behind it: `live_run.py`, `mutation_check.py`, `guard_cases.json` (`sh check.sh --evidence`) |
 | `harness-engineering.md` | overview of harness engineering as of 22.10.2026: challenges, risks, trends, practice, sources |
 | `case-study-pilot.md` | anonymized lessons of the pilot the kit was extracted from: numbers, what worked, what did not |
 | `reviews/` | periodic reviews (`prompts/harness-review.md`): verdict, radar of practices, gaps, what was implemented |

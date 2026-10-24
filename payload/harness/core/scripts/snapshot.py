@@ -2,8 +2,9 @@
 """Nightly snapshot of the harness: numbers and names only (harness/core/docs/design.md, "Measure").
 
 Collects the harness tests, the context budget, the supply chain, the failure pattern
-coverage, task contracts of recent commits, documentation coverage (when enabled),
-secrets in the git history and agent telemetry, and writes them to
+coverage, task contracts of recent commits, documentation coverage (when enabled), the
+"before" regression cases, secrets in the git history and agent telemetry, and writes
+them to
 harness/.state/snapshot.json. "problems" lists what fails; the snapshot gate of
 gates.py shows it and marks the snapshot stale after stale_hours.
 
@@ -76,6 +77,16 @@ def build(offline: bool = False) -> dict:
             problems += found
         except Exception as err:  # noqa: BLE001 - could not measure is a failure (B10)
             problems.append(f"vulnerability scanner failed: {err}")
+    import regressions  # noqa: PLC0415
+    try:
+        reg = regressions.run(ROOT, "before")
+        reg = {k: reg[k] for k in ("cases", "passed", "failed", "errors")}
+        bad = reg["failed"] + reg["errors"]
+        if bad:
+            problems.append(f"regression cases failed: {', '.join(bad)}")
+    except ValueError as err:
+        reg = {"error": str(err).splitlines()[0][:200]}
+        problems.append("regression cases malformed")
     history = commit_scan.history_secrets()
     if history:
         problems.append(f"{len(history)} secrets in the git history")
@@ -89,7 +100,7 @@ def build(offline: bool = False) -> dict:
     return {"at": dt.datetime.now().isoformat(timespec="seconds"), "problems": problems,
             "tests": t, "context": budget, "supply_chain": {"pins_and_plugins": pins,
                                                             "vulns": vulns},
-            "coverage": coverage(), "contracts": contracts(), "docs": docs,
+            "coverage": coverage(), "contracts": contracts(), "docs": docs, "regressions": reg,
             "history_secrets": len(history), "agent": agent}
 
 

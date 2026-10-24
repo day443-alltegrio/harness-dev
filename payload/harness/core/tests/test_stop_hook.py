@@ -55,6 +55,8 @@ class Stop(unittest.TestCase):
         self.assertEqual(first["decision"], "block")
         self.assertIn("syntax", first["reason"])
         self.assertIn("bad.py:1", first["reason"])
+        # The id lets a human mark a wrong block (hook_review.py).
+        self.assertRegex(first["reason"], r"^\[stop-check #[0-9a-f]{8}\] ")
         self.assertEqual(stop.handle(self.event, self.root, CONF)["decision"], "block")
         third = stop.handle(self.event, self.root, CONF)
         self.assertNotIn("decision", third)

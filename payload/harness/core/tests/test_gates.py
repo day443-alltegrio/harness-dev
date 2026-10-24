@@ -85,18 +85,115 @@ class Evidence(unittest.TestCase):
         self.assertEqual(gates.snapshot({})[0], "warn")
 
 
+WIRED = {"hooks": {
+    "PreToolUse": [{"matcher": "Bash", "hooks": [
+        {"type": "command", "command": "python3 .claude/hooks/harness/guard.py || exit 2"}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "python3 .claude/hooks/harness/stop_check.py"}]}],
+    "ConfigChange": [{"hooks": [{"type": "command",
+                                 "command": "python3 .claude/hooks/harness/config_guard.py || exit 2"}]}]}}
+
+
+class Data(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        (self.root / "harness" / "config").mkdir(parents=True)
+        self.state = self.root / "harness" / ".state"
+        self.patches = [mock.patch.object(gates, "ROOT", self.root), mock.patch.object(gates, "STATE", self.state)]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def checks(self, ids: list[str]) -> None:
+        (self.root / "harness" / "config" / "data-checks.json").write_text(json.dumps({"checks": [
+            {"id": i, "pattern": "B8", "cmd": "echo 1", "expect": {"min": 1}} for i in ids]}))
+
+    def report(self, checks: list[dict]) -> None:
+        self.state.mkdir(parents=True, exist_ok=True)
+        passed = sum(c["state"] == "pass" for c in checks)
+        (self.state / "data-checks.json").write_text(json.dumps({"checks": checks, "summary": {
+            "total": len(checks), "passed": passed}}))
+
+    def test_states(self):
+        self.checks([])
+        self.assertEqual(gates.data({})[0], "fail")  # nothing configured is not a pass
+        self.checks(["rows", "fresh"])
+        self.assertEqual(gates.data({})[0], "unknown")  # never run
+        self.report([{"id": "rows", "state": "pass", "detail": ""}])
+        self.assertEqual(gates.data({})[0], "warn")  # fresh was never run
+        self.report([{"id": "rows", "state": "pass", "detail": ""},
+                     {"id": "fresh", "state": "fail", "detail": "0 < min 1"}])
+        state, detail = gates.data({})
+        self.assertEqual((state, "fresh 0 < min 1" in detail), ("fail", True))
+        self.report([{"id": "rows", "state": "pass", "detail": ""}, {"id": "fresh", "state": "pass", "detail": ""}])
+        self.assertEqual(gates.data({}), ("pass", "2/2 data checks passed"))
+
+
 class HookLog(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.log_dir = Path(tempfile.mkdtemp())
+        (self.root / ".claude").mkdir()
+        self.settings(WIRED)
+        home = Path(tempfile.mkdtemp())
+        self.patches = [mock.patch.object(gates, "ROOT", self.root),
+                        mock.patch.object(gates.harness_config, "HOOK_LOG", self.log_dir),
+                        mock.patch.object(gates.Path, "home", return_value=home)]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def settings(self, data: dict, name: str = "settings.json") -> None:
+        (self.root / ".claude" / name).write_text(json.dumps(data))
+
+    def write_log(self, recs: list[dict]) -> None:
+        (self.log_dir / f"{time.strftime('%Y-%m-%d')}.jsonl").write_text(
+            "".join(json.dumps(r) + "\n" for r in recs))
+
     def test_counts_decisions_and_unknown_without_log(self):
-        log_dir = Path(tempfile.mkdtemp())
-        with mock.patch.object(gates.harness_config, "HOOK_LOG", log_dir):
-            self.assertEqual(gates.hook_log({})[0], "unknown")
-            day = time.strftime("%Y-%m-%d")
-            (log_dir / f"{day}.jsonl").write_text(
-                json.dumps({"decision": "deny", "rule": "secrets-read"}) + "\n"
-                + json.dumps({"decision": "ask", "rule": "deploy"}) + "\n")
-            state, detail = gates.hook_log({})
+        self.assertEqual(gates.hook_log({})[0], "unknown")
+        self.write_log([{"decision": "deny", "rule": "secrets-read"}, {"decision": "ask", "rule": "deploy"}])
+        state, detail = gates.hook_log({})
         self.assertEqual(state, "pass")
         self.assertIn("1 blocked, 1 asked", detail)
+        self.assertIn("0 of 2 marked false", detail)
+
+    def test_hooks_not_wired_or_switched_off_fail(self):
+        self.write_log([{"decision": "deny", "rule": "secrets-read"}])
+        self.settings({"hooks": {}})
+        state, detail = gates.hook_log({})
+        self.assertEqual(state, "fail")
+        self.assertIn("guard.py", detail)
+        self.settings(WIRED)
+        self.settings({"disableAllHooks": True}, "settings.local.json")
+        state, detail = gates.hook_log({})
+        self.assertEqual(state, "fail")
+        self.assertIn("disableAllHooks", detail)
+
+    def test_sandbox_state_in_the_line_and_a_required_sandbox_off_fails(self):
+        self.write_log([{"decision": "ask", "rule": "deploy"}])
+        self.assertIn("sandbox off", gates.hook_log({})[1])
+        cfg = self.root / "harness" / "config"
+        cfg.mkdir(parents=True)
+        (cfg / "sandbox.json").write_text(json.dumps({"enabled": True, "required": True}))
+        state, detail = gates.hook_log({})
+        self.assertEqual(state, "fail")
+        self.assertIn("differs", detail)
+
+    def test_rule_over_the_false_block_share_warns(self):
+        self.write_log([{"decision": "deny", "rule": "secrets-read", "id": f"a{i:07d}"} for i in range(5)])
+        marks = self.log_dir / "marks"
+        marks.mkdir()
+        (marks / "false-blocks.jsonl").write_text("".join(
+            json.dumps({"id": f"a{i:07d}", "verdict": "false"}) + "\n" for i in range(2)))
+        state, detail = gates.hook_log({})
+        self.assertEqual(state, "warn")
+        self.assertIn("secrets-read", detail)
 
 
 if __name__ == "__main__":

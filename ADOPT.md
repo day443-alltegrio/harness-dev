@@ -28,9 +28,11 @@ Ground rules for every task:
 2. **Dry run.** `python3 <KIT>/harness.py install <REPO> --dry-run --verbose`. Tell the
    user in a few lines: kit version, how many kit files, which project files will be
    created, what is merged into `.claude/settings.json` (guard and Stop hooks, deny rules
-   for secret files) and `CLAUDE.md` (a block with two imports). Mention the effect: the
-   agent will be asked before deploys, pushes and outbound uploads, blocked from reading
-   secrets and from destructive git commands, and checked before it ends an answer.
+   for secret files, the ConfigChange hook) and `CLAUDE.md` (a block with two imports).
+   Mention the effect: the agent will be asked before deploys, pushes, outbound uploads,
+   edits of its own settings and of kit files, blocked from reading secrets and from
+   destructive git commands, checked before it ends an answer, and settings changes that
+   switch the hooks off will not apply mid-session.
 3. **Install** after the "yes": `python3 <KIT>/harness.py install <REPO>`.
 4. **Configure.** Follow `<REPO>/.claude/skills/harness-setup/SKILL.md` (installed by
    step 3): inspect the stack, fill `harness/config/*.json` and
@@ -41,10 +43,12 @@ Ground rules for every task:
    `python3 harness/core/scripts/gates.py`. Expected right after an install: QG0
    unknown until the first hook runs in a Claude Code session in `<REPO>`; QG1 pass; QG2
    fails until the install is committed together with its adoption contract; inactive
-   gates show their reasons. Any other failure is a setting to fix (or a kit bug to
-   report, never patched in `harness/core/`).
+   gates show their reasons. QG0 fails when the hooks are not wired or are switched off.
+   Any other failure is a setting to fix (or a kit bug to report, never patched in
+   `harness/core/`).
 6. **Hand over.** Report: version, level, active gates, what still needs the user
-   (deploy hooks, nightly snapshot, scenarios map, sandbox), the gate table as is. Propose
+   (deploy hooks, nightly snapshot and data checks, scenarios map, sandbox, a first
+   golden run once the install is committed: it calls the model), the gate table as is. Propose
    the commit, for example:
    ```
    infra

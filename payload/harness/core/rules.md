@@ -81,7 +81,8 @@ a line of a script.
 - Classify a failure against `harness/core/docs/failure-patterns.md` and the project
   incidents first, then fix the class, not the one case.
 - Every fix gets a test that fires on the failure; every closed ticket with a result a
-  human confirmed becomes a regression test.
+  human confirmed becomes a regression case (`harness/project/regressions/`, skill
+  `harness-regression`). A case is never edited to make it pass.
 - A substitute for missing data is a human decision, written down; never invent one.
 - A new failure becomes a check at the earliest point where it can be deterministic
   (skill `harness-incident`).
@@ -103,6 +104,11 @@ a line of a script.
   service.
 - **Empty is a failure.** A check that could not measure, found nothing to check or
   has stale evidence does not pass.
+- **A block is not an obstacle.** When a hook blocks or asks, say what was stopped and
+  why; never route around it with another command, a script or another tool. When the
+  human says the decision was wrong, mark it with the id from the reason:
+  `python3 harness/core/scripts/hook_review.py mark <id> --reason "..."`; never mark one
+  on your own judgement.
 
 ## Text style
 

@@ -8,6 +8,7 @@ Reads ~/.claude/projects/<slug>/*.jsonl (main sessions) and
   tool_calls, by_tool    - tool calls (main agent and subagents separately);
   tool_errors            - tool results with an error;
   hook_blocks            - guard hook decisions by rule (deny/ask);
+  false_blocks           - of those, marked false by a human (hook_review.py);
   repeat_streaks         - runs of 3+ identical Bash commands (the agent loops on a fix);
   tokens                 - input, output, cache (one message counted once);
   compactions            - context compactions.
@@ -58,6 +59,7 @@ def day_of(ts: str) -> str | None:
 def empty() -> dict:
     return {"sessions": set(), "prompts": 0, "tool_calls": 0, "subagent_tool_calls": 0,
             "by_tool": Counter(), "tool_errors": 0, "hook_blocks": Counter(),
+            "false_blocks": Counter(),
             "repeat_streaks": 0, "tokens": Counter(), "compactions": 0, "subagents": 0}
 
 
@@ -125,7 +127,17 @@ def scan(path: Path, days: dict, since: str, subagent: bool) -> None:
 
 
 def scan_hooks(log_dir: Path, days: dict, since: str) -> None:
+    marked = set()
+    marks = log_dir / "marks" / "false-blocks.jsonl"
+    if marks.is_file():
+        for line in marks.read_text(encoding="utf-8").splitlines():
+            try:
+                marked.add(json.loads(line).get("id"))
+            except ValueError:
+                continue
     for f in sorted(log_dir.glob("*.jsonl")):
+        if not re.match(r"^\d{4}-\d{2}-\d{2}\.jsonl$", f.name):
+            continue
         for line in f.read_text(encoding="utf-8").splitlines():
             try:
                 rec = json.loads(line)
@@ -134,6 +146,8 @@ def scan_hooks(log_dir: Path, days: dict, since: str) -> None:
             day = (rec.get("ts") or "")[:10]
             if day >= since:
                 days[day]["hook_blocks"][f"{rec.get('rule')}:{rec.get('decision')}"] += 1
+                if rec.get("id") and rec["id"] in marked:
+                    days[day]["false_blocks"][rec.get("rule")] += 1
 
 
 def collect(project_dir: Path, hooks_dir: Path, n_days: int = 30) -> dict:
@@ -154,6 +168,7 @@ def collect(project_dir: Path, hooks_dir: Path, n_days: int = 30) -> dict:
                     "sessions": len(m["sessions"]),
                     "by_tool": dict(m["by_tool"].most_common(12)),
                     "hook_blocks": dict(m["hook_blocks"]),
+                    "false_blocks": dict(m["false_blocks"]),
                     "tokens": dict(m["tokens"])}
     return {"generated_at": datetime.now(TZ).isoformat(timespec="seconds"),
             "transcripts": files, "days": out}

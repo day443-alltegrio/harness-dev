@@ -51,6 +51,9 @@ DEFAULTS: dict = {
         ],
         "sections": ["## Goal", "## Non-goals", "## Acceptance criteria", "## Boundaries",
                      "## Risks and rollback", "## Related failures"],
+        # Acceptance criteria name their checks in backticks; named tests and
+        # regression cases must exist, and a done contract names at least one check.
+        "checkable": True,
     },
     "scan": {
         "skip_prefixes": ["node_modules/", "dist/", "build/", "vendor/", ".venv/"],
@@ -95,6 +98,33 @@ DEFAULTS: dict = {
         "env_drop": [],
         # Test files that must exist and pass; reported separately.
         "security_tests": [],
+        "timeout_s": 300,
+        # Replay the "before" regression cases (regressions.py) on the new code.
+        "regressions": True,
+    },
+    # QG6: data invariants (data_checks.py). Each check is a project command that
+    # prints a number or a JSON object of numbers, compared with a fixed rule.
+    "data_checks": {
+        "file": "harness/config/data-checks.json",
+        # Per command, unless the check sets its own timeout_s.
+        "timeout_s": 600,
+        # Lines kept in harness/.state/data-history.jsonl (baseline for drop_max).
+        "history_keep": 2000,
+    },
+    # Hook decisions marked as false blocks by people (hook_review.py): a rule over
+    # the share of its decisions in the window, with at least min decisions, is
+    # reviewed (design.md, section 10).
+    "hooks": {"false_block_share": 0.2, "false_block_min": 5, "window_days": 30},
+    # The operating system sandbox of Claude Code (sandbox_config.py).
+    "sandbox": {"file": "harness/config/sandbox.json"},
+    # Golden tasks run by the real agent (golden_tasks.py): the claude CLI, its model
+    # (None: the CLI default), the budget per task and what the agent may use.
+    "golden": {"file": "harness/config/golden-tasks.json", "claude": "claude", "model": None,
+               "max_turns": 12, "timeout_s": 900, "permission_mode": "acceptEdits",
+               "allowed_tools": "Bash,Read,Edit,Write,Grep,Glob"},
+    # Replay of closed tickets whose result a human confirmed (regressions.py).
+    "regressions": {
+        "dir": "harness/project/regressions/",
         "timeout_s": 300,
     },
 }

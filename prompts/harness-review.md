@@ -68,8 +68,12 @@ kit, and turn the best few findings into a new kit version that a human can merg
    bump it needs (PATCH, MINOR, MAJOR) and what a project must do to upgrade.
 7. **Implement** the top ones within the budget in the review worktree: code, tests,
    docs, a migration if a setting changes, `VERSION`, a `CHANGELOG.md` section with
-   `[+] [*] [X] [-] [!]` lines (`[!]` for every upgrade step). Run `sh check.sh` until
-   green.
+   `[+] [*] [X] [-] [!]` lines (`[!]` for every upgrade step). Run `sh check.sh --evidence`
+   until green: the kit tests, a fresh install, the live run and the mutation check (a
+   mutant that survives is a missing test). Recheck the hook protocol reference in
+   `payload/harness/core/tests/test_hook_protocol.py` against the current Claude Code
+   documentation. With the user's "yes" (it calls the model), run the golden tasks on a
+   demo project and update `research/evidence.md`.
 8. **Report.** Write `research/reviews/<date>.md` in the review worktree with these
    sections: Verdict, What changed since the last review, Radar, Gaps (ranked),
    Implemented (version, files, tests), Proposed but not implemented, Needs a human

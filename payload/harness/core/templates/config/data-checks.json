@@ -1,0 +1,87 @@
+{
+  "_comment": "QG6 data invariants, run by harness/core/scripts/data_checks.py (nightly and after a data run; the docstring has the details). Each check runs a shell command in the project root that prints a count: the last non-empty line of stdout is a plain number or a one-line JSON object of numbers, compared with one fixed rule. A command that fails, times out or prints nothing is an error, never a pass, and a file without checks is not a pass either. Commands print counts, not rows: the script never shows or stores what a command prints, only the numbers it reads. To start, move an example from _examples into checks and replace its command with a real counter. Keys starting with _ are comments.",
+  "_fields": "id (required; letters, digits, _ . -), pattern (a failure pattern id such as B4, or a project pattern such as P2), title, cmd (required), expect (required, exactly one rule), key (the field of a JSON output that eq, min, max, range and drop_max read), timeout_s (overrides data_checks.timeout_s of harness.json).",
+  "_rules": "eq: N; min: N; max: N; range: [lo, hi]; equal: [a, b] (two fields of the JSON output are equal); ratio_max: [num, den, share] (num / den <= share, den 0 is an error); drop_max: share between 0 and 1 (fails when the value falls below the baseline times 1 - share; the baseline is the newest value of the check that passed or that a person accepted, never a failing one, so a sustained drop keeps failing until someone accepts the new level with data_checks.py --accept ID --reason ...; the first run records the baseline).",
+  "checks": [],
+  "_examples": [
+    {
+      "id": "mask-false-positives",
+      "pattern": "B1",
+      "title": "a masking rule makes at most 2 wrong replacements on the frozen reference set",
+      "cmd": "psql -tAc \"select count(*) from reference_masks where masked and not expected\"",
+      "expect": {"max": 2}
+    },
+    {
+      "id": "known-values-absent",
+      "pattern": "B2",
+      "title": "values known to be sensitive never appear in the cleaned output",
+      "cmd": "psql -tAc \"select count(*) from cleaned_texts c join known_values k on strpos(c.body, k.value) > 0\"",
+      "expect": {"eq": 0}
+    },
+    {
+      "id": "derived-version",
+      "pattern": "B4",
+      "title": "every derived item is built from the current source version",
+      "cmd": "psql -tAc \"select json_build_object('derived', (select min(source_version) from derived_items), 'source', (select max(version) from source_items))\"",
+      "expect": {"equal": ["derived", "source"]}
+    },
+    {
+      "id": "zero-vectors",
+      "pattern": "B4",
+      "title": "no missing or zero embedding vectors",
+      "cmd": "psql -tAc \"select count(*) from embeddings where embedding is null or vector_norm(embedding) = 0\"",
+      "expect": {"eq": 0},
+      "timeout_s": 300
+    },
+    {
+      "id": "negative-controls",
+      "pattern": "B5",
+      "title": "negative control phrases produce no extracted facts",
+      "cmd": "python3 tools/extract.py --count --input tests/data/negative-phrases.txt",
+      "expect": {"eq": 0}
+    },
+    {
+      "id": "group-control-number",
+      "pattern": "B6",
+      "title": "a code group expands to its control number of codes",
+      "cmd": "python3 tools/group_sizes.py --json",
+      "key": "example-group",
+      "expect": {"range": [40, 44]}
+    },
+    {
+      "id": "search-smoke",
+      "pattern": "B8",
+      "title": "a smoke query returns rows",
+      "cmd": "curl -fsS 'http://127.0.0.1:8000/search?q=example' | python3 -c \"import json, sys; print(len(json.load(sys.stdin)['items']))\"",
+      "expect": {"min": 1}
+    },
+    {
+      "id": "index-size",
+      "pattern": "B8",
+      "title": "the search index never falls more than 20% below its last good size",
+      "cmd": "psql -tAc \"select count(*) from search_index\"",
+      "expect": {"drop_max": 0.2}
+    },
+    {
+      "id": "load-rows",
+      "pattern": "B9",
+      "title": "the last load wrote as many rows as it read",
+      "cmd": "psql -tAc \"select json_build_object('read', rows_read, 'written', rows_written) from load_runs order by finished_at desc limit 1\"",
+      "expect": {"equal": ["read", "written"]}
+    },
+    {
+      "id": "empty-rows",
+      "pattern": "B9",
+      "title": "no decoded rows with empty text",
+      "cmd": "psql -tAc \"select count(*) from decoded_rows where coalesce(length(body), 0) = 0\"",
+      "expect": {"eq": 0}
+    },
+    {
+      "id": "service-traffic-share",
+      "pattern": "B11",
+      "title": "service accounts make at most 5% of the requests in the usage statistics",
+      "cmd": "psql -tAc \"select json_build_object('service', count(*) filter (where is_service), 'all', count(*)) from usage_stats\"",
+      "expect": {"ratio_max": ["service", "all", 0.05]}
+    }
+  ]
+}

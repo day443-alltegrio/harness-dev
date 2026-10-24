@@ -1,129 +1,403 @@
 {
-  "_comment": "Which check catches each failure pattern and which test proves it. Generic patterns (A1..A10, B1..B11) come from harness/core/docs/failure-patterns.md and their titles match it; project patterns (P1, P2...) are defined in harness/project/incidents.md. status: covered - a check with a test that fires on the failure; partial - part of the pattern; none - no check yet. Tests are named module.Class.method and live in harness/core/tests or harness/project/tests. test_incident_registry.py keeps this file honest.",
-  "patterns": {
-    "A1": {
-      "title": "The server runs the wrong code",
-      "status": "partial",
-      "checks": [
-        {"name": "preflight: clean tree, main copy, deploy branch", "where": "harness/core/scripts/deploy.sh",
-         "tests": ["test_preflight.Preflight.test_dirty_tree_fails", "test_preflight.Preflight.test_untracked_file_fails",
-                   "test_preflight.Preflight.test_wrong_branch_fails"]},
-        {"name": "preflight: the new commit descends from the deployed one", "where": "harness/core/scripts/deploy.sh",
-         "tests": ["test_preflight.Lineage.test_new_commit_must_descend_from_deployed"]},
-        {"name": "deploy stops before anything ships", "where": "harness/core/scripts/deploy.sh",
-         "tests": ["test_deploy_sh.Deploy.test_dirty_tree_stops_before_anything_ships"]}
-      ],
-      "missing": "hash of the running code checked after the swap; code version in reports of long jobs"
+ "_comment": "Which check catches each failure pattern and which test proves it. Generic patterns (A1..A10, B1..B11) come from harness/core/docs/failure-patterns.md and their titles match it; project patterns (P1, P2...) are defined in harness/project/incidents.md. status: covered - a check with a test that fires on the failure; partial - part of the pattern; none - no check yet. Tests are named module.Class.method and live in harness/core/tests or harness/project/tests. test_incident_registry.py keeps this file honest.",
+ "patterns": {
+  "A1": {
+   "title": "The server runs the wrong code",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "preflight: clean tree, main copy, deploy branch",
+     "where": "harness/core/scripts/deploy.sh",
+     "tests": [
+      "test_preflight.Preflight.test_dirty_tree_fails",
+      "test_preflight.Preflight.test_untracked_file_fails",
+      "test_preflight.Preflight.test_wrong_branch_fails"
+     ]
     },
-    "A2": {"title": "Code runs ahead of the database schema", "status": "none", "checks": [],
-           "missing": "schema snapshot check before restart; versioned migrations inside the deploy"},
-    "A3": {
-      "title": "Config drifts between machines",
-      "status": "partial",
-      "checks": [
-        {"name": "supply chain: pinned versions and lock files", "where": "harness/core/scripts/run.sh",
-         "tests": ["test_supply_chain.Pins.test_unpinned_fails", "test_supply_chain.Pins.test_missing_lock_fails"]}
-      ],
-      "missing": "required env keys; the same config files on every machine"
+    {
+     "name": "preflight: the new commit descends from the deployed one",
+     "where": "harness/core/scripts/deploy.sh",
+     "tests": [
+      "test_preflight.Lineage.test_new_commit_must_descend_from_deployed"
+     ]
     },
-    "A4": {
-      "title": "The build is stale or wipes files",
-      "status": "partial",
-      "checks": [
-        {"name": "preflight: build stamp from the deployed commit", "where": "harness/core/scripts/deploy.sh",
-         "tests": ["test_preflight.BuildStamp.test_stale_build_fails", "test_preflight.BuildStamp.test_build_from_dirty_tree_fails"]}
-      ],
-      "missing": "build_stamp set in harness.json; a project test that the build never deletes tracked files"
+    {
+     "name": "deploy stops before anything ships",
+     "where": "harness/core/scripts/deploy.sh",
+     "tests": [
+      "test_deploy_sh.Deploy.test_dirty_tree_stops_before_anything_ships"
+     ]
+    }
+   ],
+   "missing": "hash of the running code checked after the swap; code version in reports of long jobs"
+  },
+  "A2": {
+   "title": "Code runs ahead of the database schema",
+   "status": "none",
+   "checks": [],
+   "missing": "schema snapshot check before restart; versioned migrations inside the deploy"
+  },
+  "A3": {
+   "title": "Config drifts between machines",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "supply chain: pinned versions and lock files",
+     "where": "harness/core/scripts/run.sh",
+     "tests": [
+      "test_supply_chain.Pins.test_unpinned_fails",
+      "test_supply_chain.Pins.test_missing_lock_fails"
+     ]
+    }
+   ],
+   "missing": "required env keys; the same config files on every machine"
+  },
+  "A4": {
+   "title": "The build is stale or wipes files",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "preflight: build stamp from the deployed commit",
+     "where": "harness/core/scripts/deploy.sh",
+     "tests": [
+      "test_preflight.BuildStamp.test_stale_build_fails",
+      "test_preflight.BuildStamp.test_build_from_dirty_tree_fails"
+     ]
+    }
+   ],
+   "missing": "build_stamp set in harness.json; a project test that the build never deletes tracked files"
+  },
+  "A5": {
+   "title": "Permissions, access and secrets",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "guard: secrets are never read",
+     "where": ".claude/hooks/harness/guard.py",
+     "tests": [
+      "test_hooks.Guard.test_must_deny",
+      "test_hooks.Guard.test_read_secrets_denied_and_example_allowed"
+     ]
     },
-    "A5": {
-      "title": "Permissions, access and secrets",
-      "status": "partial",
-      "checks": [
-        {"name": "guard: secrets are never read", "where": ".claude/hooks/harness/guard.py",
-         "tests": ["test_hooks.Guard.test_must_deny", "test_hooks.Guard.test_read_secrets_denied_and_example_allowed"]},
-        {"name": "commit scanner: secrets in added lines and in history", "where": "harness/core/scripts/preflight.py",
-         "tests": ["test_commit_scan.Lines.test_must_find", "test_commit_scan.Diff.test_history_finds_secret_kind_without_value"]},
-        {"name": "deploy check: required security tests", "where": "harness/core/scripts/deploy_check.py",
-         "tests": ["test_deploy_check.Verdict.test_failed_and_missing_security_tests"]}
-      ],
-      "missing": "route access matrix test; grant snapshot; env file modes; sign-in with each role after the deploy"
+    {
+     "name": "commit scanner: secrets in added lines and in history",
+     "where": "harness/core/scripts/preflight.py",
+     "tests": [
+      "test_commit_scan.Lines.test_must_find",
+      "test_commit_scan.Diff.test_history_finds_secret_kind_without_value"
+     ]
     },
-    "A6": {
-      "title": "Broken edits without a linter",
-      "status": "partial",
-      "checks": [
-        {"name": "Stop hook: syntax of changed files", "where": ".claude/hooks/harness/stop_check.py",
-         "tests": ["test_stop_hook.Stop.test_broken_file_blocks_then_warns"]}
-      ],
-      "missing": "a linter for undefined names (ruff F, tsc) in the Stop checks and preflight; smoke after the deploy"
+    {
+     "name": "deploy check: required security tests",
+     "where": "harness/core/scripts/deploy_check.py",
+     "tests": [
+      "test_deploy_check.Verdict.test_failed_and_missing_security_tests"
+     ]
     },
-    "A7": {"title": "Deploys and background jobs collide", "status": "none", "checks": [],
-           "missing": "preflight check that no long job is running"},
-    "A8": {"title": "Regressions between waves of fixes", "status": "none", "checks": [],
-           "missing": "closed tickets with a confirmed result replayed as regression tests on each deploy"},
-    "A9": {
-      "title": "The deploy process stops the deploy",
-      "status": "partial",
-      "checks": [
-        {"name": "guard: a confirmation per deploy command", "where": ".claude/hooks/harness/guard.py",
-         "tests": ["test_hooks.Guard.test_must_ask"]},
-        {"name": "deploy: notes required, archive from git", "where": "harness/core/scripts/deploy.sh",
-         "tests": ["test_deploy_sh.Deploy.test_notes_need_markers", "test_deploy_sh.Deploy.test_success_records_and_moves_the_deployed_ref"]}
-      ],
-      "missing": "files on the server compared with git"
+    {
+     "name": "guard: secret files are not written, keys and tokens are not written into files",
+     "where": ".claude/hooks/harness/guard.py",
+     "tests": [
+      "test_hooks.Guard.test_edit_and_write"
+     ]
     },
-    "A10": {
-      "title": "Documentation diverges from the code",
-      "status": "partial",
-      "checks": [
-        {"name": "QG8: scenarios tied to code, fingerprints, tests", "where": "harness/core/scripts/doc_coverage.py",
-         "tests": ["test_doc_coverage.Coverage.test_code_change_is_drift", "test_doc_coverage.Coverage.test_orphan_file_fails_and_service_does_not",
-                   "test_doc_coverage.Coverage.test_people_scenario_needs_a_test"]}
-      ],
-      "missing": "docs.enabled in harness.json and the scenarios map of this project"
+    {
+     "name": "guard: Grep into secret files and scripts the agent wrote are checked too",
+     "where": ".claude/hooks/harness/guard.py",
+     "tests": [
+      "test_hooks.Guard.test_grep_into_secrets_denied",
+      "test_hooks.Guard.test_scripts_the_agent_wrote_are_read_before_they_run"
+     ]
     },
-    "B1": {"title": "A transformation damages the data", "status": "none", "checks": [],
-           "missing": "false-positive counter on a frozen reference set"},
-    "B2": {"title": "Sensitive data survives a cleanup step", "status": "none", "checks": [],
-           "missing": "independent detector of known values in the output"},
-    "B3": {
-      "title": "Identifiers leak in exports",
-      "status": "partial",
-      "checks": [
-        {"name": "guard: outbound commands ask a human", "where": ".claude/hooks/harness/guard.py",
-         "tests": ["test_hooks.Guard.test_must_ask"]},
-        {"name": "commit scanner: project ID patterns", "where": "harness/core/scripts/preflight.py",
-         "tests": ["test_commit_scan.Lines.test_must_find"]}
-      ],
-      "missing": "id_patterns of this project in harness.json; a scanner of data exports"
+    {
+     "name": "sandbox: operating system boundary with a network allowlist, no retry outside it",
+     "where": "harness/core/scripts/sandbox_config.py",
+     "tests": [
+      "test_sandbox_config.Sandbox.test_render_closes_the_escape_hatch"
+     ]
     },
-    "B4": {"title": "Stale derived data and mixed versions", "status": "none", "checks": [],
-           "missing": "nightly invariant: derived version equals source version"},
-    "B5": {"title": "Extraction rules produce false positives", "status": "none", "checks": [],
-           "missing": "negative control phrases"},
-    "B6": {"title": "Dictionaries and code groups give wrong sets", "status": "none", "checks": [],
-           "missing": "golden sets with control numbers"},
-    "B7": {"title": "Deterministic rules misread the intent", "status": "none", "checks": [],
-           "missing": "plan validation against the request"},
-    "B8": {"title": "Results are silently truncated", "status": "none", "checks": [],
-           "missing": "smoke check with a non-empty result after the deploy"},
-    "B9": {"title": "ETL and decoders lose or shift data", "status": "none", "checks": [],
-           "missing": "input equals output counters"},
-    "B10": {
-      "title": "Monitors report success on emptiness",
-      "status": "partial",
-      "checks": [
-        {"name": "gate table: no evidence is unknown, a crash is an error, stale is a warning", "where": "harness/core/scripts/gates.py",
-         "tests": ["test_gates.Rows.test_crashing_check_is_an_error_not_a_pass", "test_gates.Evidence.test_no_report_is_unknown",
-                   "test_gates.Evidence.test_fresh_pass_and_stale_warn"]},
-        {"name": "a scanner that fails is a failure", "where": "harness/core/scripts/supply_chain.py",
-         "tests": ["test_supply_chain.Vulns.test_scanner_failure_is_a_failure"]},
-        {"name": "no tests ran means blocked", "where": "harness/core/scripts/deploy_check.py",
-         "tests": ["test_deploy_check.Verdict.test_no_tests_is_not_a_pass"]}
-      ],
-      "missing": "the same rule in data checks (QG6)"
+    {
+     "name": "ConfigChange hook: settings cannot switch the hooks or the sandbox off mid-session",
+     "where": ".claude/hooks/harness/config_guard.py",
+     "tests": [
+      "test_config_guard.ConfigGuard.test_switching_hooks_off_is_blocked_at_any_level",
+      "test_config_guard.ConfigGuard.test_required_sandbox_cannot_be_switched_off"
+     ]
+    }
+   ],
+   "missing": "route access matrix test; grant snapshot; env file modes; sign-in with each role after the deploy"
+  },
+  "A6": {
+   "title": "Broken edits without a linter",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "Stop hook: syntax of changed files",
+     "where": ".claude/hooks/harness/stop_check.py",
+     "tests": [
+      "test_stop_hook.Stop.test_broken_file_blocks_then_warns"
+     ]
+    }
+   ],
+   "missing": "a linter for undefined names (ruff F, tsc) in the Stop checks and preflight; smoke after the deploy"
+  },
+  "A7": {
+   "title": "Deploys and background jobs collide",
+   "status": "none",
+   "checks": [],
+   "missing": "preflight check that no long job is running"
+  },
+  "A8": {
+   "title": "Regressions between waves of fixes",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "regression cases: closed tickets with a confirmed result, replayed by run.sh and in the deploy check",
+     "where": "harness/core/scripts/regressions.py",
+     "tests": [
+      "test_regressions.Load.test_missing_confirmed",
+      "test_regressions.Expect.test_number_exact",
+      "test_deploy_check.Run.test_regression_cases_replay_on_the_new_code"
+     ]
+    }
+   ],
+   "missing": "the project's own cases in harness/project/regressions/; the after-swap replay in deploy_health"
+  },
+  "A9": {
+   "title": "The deploy process stops the deploy",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "guard: a confirmation per deploy command",
+     "where": ".claude/hooks/harness/guard.py",
+     "tests": [
+      "test_hooks.Guard.test_must_ask"
+     ]
     },
-    "B11": {"title": "Service traffic and translations pollute results", "status": "none", "checks": [],
-            "missing": "separate service traffic; placeholder check in translations"}
+    {
+     "name": "deploy: notes required, archive from git",
+     "where": "harness/core/scripts/deploy.sh",
+     "tests": [
+      "test_deploy_sh.Deploy.test_notes_need_markers",
+      "test_deploy_sh.Deploy.test_success_records_and_moves_the_deployed_ref"
+     ]
+    }
+   ],
+   "missing": "files on the server compared with git"
+  },
+  "A10": {
+   "title": "Documentation diverges from the code",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "QG8: scenarios tied to code, fingerprints, tests",
+     "where": "harness/core/scripts/doc_coverage.py",
+     "tests": [
+      "test_doc_coverage.Coverage.test_code_change_is_drift",
+      "test_doc_coverage.Coverage.test_orphan_file_fails_and_service_does_not",
+      "test_doc_coverage.Coverage.test_people_scenario_needs_a_test"
+     ]
+    }
+   ],
+   "missing": "docs.enabled in harness.json and the scenarios map of this project"
+  },
+  "B1": {
+   "title": "A transformation damages the data",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: a false-positive counter under a limit (max, ratio_max)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_max",
+      "test_data_checks.Rules.test_ratio_max"
+     ]
+    }
+   ],
+   "missing": "the project's counter on a frozen reference set in harness/config/data-checks.json"
+  },
+  "B2": {
+   "title": "Sensitive data survives a cleanup step",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: known values never appear in the output (eq 0)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_eq"
+     ]
+    }
+   ],
+   "missing": "an independent detector of known values as a project counter"
+  },
+  "B3": {
+   "title": "Identifiers leak in exports",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "guard: outbound commands ask a human",
+     "where": ".claude/hooks/harness/guard.py",
+     "tests": [
+      "test_hooks.Guard.test_must_ask"
+     ]
+    },
+    {
+     "name": "commit scanner: project ID patterns",
+     "where": "harness/core/scripts/preflight.py",
+     "tests": [
+      "test_commit_scan.Lines.test_must_find"
+     ]
+    }
+   ],
+   "missing": "id_patterns of this project in harness.json; a scanner of data exports"
+  },
+  "B4": {
+   "title": "Stale derived data and mixed versions",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: derived version equals source version (equal), no zero vectors (eq 0)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_equal",
+      "test_data_checks.Rules.test_eq"
+     ]
+    }
+   ],
+   "missing": "the project's version counters, run nightly"
+  },
+  "B5": {
+   "title": "Extraction rules produce false positives",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: negative control phrases produce no facts (eq 0)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_eq"
+     ]
+    }
+   ],
+   "missing": "the project's negative control set"
+  },
+  "B6": {
+   "title": "Dictionaries and code groups give wrong sets",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: control numbers of golden sets (range)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_range"
+     ]
+    }
+   ],
+   "missing": "the project's golden sets with control numbers"
+  },
+  "B7": {
+   "title": "Deterministic rules misread the intent",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "regression cases: answers a human confirmed are replayed on every deploy",
+     "where": "harness/core/scripts/regressions.py",
+     "tests": [
+      "test_regressions.Expect.test_json_paths",
+      "test_regressions.Expect.test_number_exact"
+     ]
+    }
+   ],
+   "missing": "plan validation: every condition of the request is in the plan"
+  },
+  "B8": {
+   "title": "Results are silently truncated",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: a smoke query returns rows (min), no sharp drop until a human accepts the new level (drop_max)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_min",
+      "test_data_checks.DropMax.test_sustained_drop_fails_on_every_run"
+     ]
+    }
+   ],
+   "missing": "the project's smoke counters; completeness against a direct query"
+  },
+  "B9": {
+   "title": "ETL and decoders lose or shift data",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: rows in equal rows out (equal), no zero-length rows (eq 0)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_equal"
+     ]
+    }
+   ],
+   "missing": "the project's input and output counters"
+  },
+  "B10": {
+   "title": "Monitors report success on emptiness",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "gate table: no evidence is unknown, a crash is an error, stale is a warning",
+     "where": "harness/core/scripts/gates.py",
+     "tests": [
+      "test_gates.Rows.test_crashing_check_is_an_error_not_a_pass",
+      "test_gates.Evidence.test_no_report_is_unknown",
+      "test_gates.Evidence.test_fresh_pass_and_stale_warn"
+     ]
+    },
+    {
+     "name": "a scanner that fails is a failure",
+     "where": "harness/core/scripts/supply_chain.py",
+     "tests": [
+      "test_supply_chain.Vulns.test_scanner_failure_is_a_failure"
+     ]
+    },
+    {
+     "name": "no tests ran means blocked",
+     "where": "harness/core/scripts/deploy_check.py",
+     "tests": [
+      "test_deploy_check.Verdict.test_no_tests_is_not_a_pass"
+     ]
+    },
+    {
+     "name": "data checks: no output, a non-zero exit, not a number and no checks at all are failures",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Empty.test_no_output_is_an_error",
+      "test_data_checks.Empty.test_not_a_number_is_an_error",
+      "test_data_checks.Empty.test_no_checks_is_not_a_pass"
+     ]
+    },
+    {
+     "name": "hooks switched off or not wired fail the gate; golden tasks with nothing measured are not a pass",
+     "where": "harness/core/scripts/gates.py",
+     "tests": [
+      "test_gates.HookLog.test_hooks_not_wired_or_switched_off_fail",
+      "test_golden_tasks.Golden.test_config_errors_and_nothing_to_run"
+     ]
+    }
+   ],
+   "missing": "meters that test themselves on synthetic pairs"
+  },
+  "B11": {
+   "title": "Service traffic and translations pollute results",
+   "status": "partial",
+   "checks": [
+    {
+     "name": "data checks: the share of service traffic stays under a limit (ratio_max)",
+     "where": "harness/core/scripts/data_checks.py",
+     "tests": [
+      "test_data_checks.Rules.test_ratio_max"
+     ]
+    }
+   ],
+   "missing": "placeholder check in translations; deduplication of automated tickets"
   }
+ }
 }

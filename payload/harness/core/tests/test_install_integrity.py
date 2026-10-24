@@ -25,6 +25,12 @@ class Integrity(unittest.TestCase):
             self.assertTrue(any(f".claude/hooks/harness/{script}" in c for c in commands), script)
         guard = next(c for c in commands if "guard.py" in c)
         self.assertTrue(guard.rstrip().endswith("|| exit 2"), "a failing guard must block")
+        # The guard sees every tool the kit wires it for (a narrowed matcher is a hole).
+        want = set(frag["hooks"]["PreToolUse"][0]["matcher"].split("|"))
+        have = {t for e in settings["hooks"]["PreToolUse"]
+                if any("guard.py" in h.get("command", "") for h in e.get("hooks", []))
+                for t in e.get("matcher", "").split("|")}
+        self.assertLessEqual(want, have, "the guard matcher misses tools")
         for rule in frag["permissions"]["deny"]:
             self.assertIn(rule, settings["permissions"]["deny"])
 

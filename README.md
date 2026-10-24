@@ -1,10 +1,15 @@
 # harness-dev
 
 A generic, versioned harness for repositories developed with coding agents (Claude Code
-first): agent rules, guard and Stop hooks, quality gates with a one-table report,
-preflight and a gated deploy, task contracts, a failure catalog that turns every
-failure into a check, skills and reviewer subagents, budgets, telemetry, and the
+first): agent rules, guard, Stop and ConfigChange hooks, an optional OS sandbox, quality
+gates with a one-table report, preflight and a gated deploy, task contracts with
+checkable acceptance criteria, data checks, regression cases from confirmed tickets, a
+failure catalog that turns every failure into a check, golden tasks that measure the
+harness with the real agent, skills and reviewer subagents, budgets, telemetry, and the
 research behind it. Extracted from a production pilot and anonymized.
+
+What it does and the evidence that it works, version by version:
+[research/evidence.md](research/evidence.md).
 
 **With an agent:** say "from `/path/to/harness-dev` deploy the generic harness in my
 repository `/path/to/repo`". The agent follows [ADOPT.md](ADOPT.md): dry run, your
@@ -28,13 +33,13 @@ pip-audit, shellcheck and bandit; `npm` for npm audit.
 |---|---|---|
 | Generic agent rules, imported by `CLAUDE.md` | `harness/core/rules.md` | kit |
 | Design, gates, levels, failure patterns | `harness/core/docs/` | kit |
-| Guard hook (deny or ask), Stop hook (fast checks before an answer ends) | `.claude/hooks/harness/` | kit |
-| Gate table, preflight, deploy wrapper, deploy check, commit scanner, supply chain, context budget, doc coverage, style and syntax checks, telemetry, snapshot | `harness/core/scripts/` | kit |
+| Guard hook (deny or ask), Stop hook (fast checks before an answer ends), ConfigChange hook (no weakening settings mid-session) | `.claude/hooks/harness/` | kit |
+| Gate table, preflight, deploy wrapper, deploy check, commit scanner, supply chain, context budget, doc coverage, data checks, regression cases, hook review, sandbox settings, golden tasks, style and syntax checks, telemetry, snapshot | `harness/core/scripts/` | kit |
 | Tests of all of the above | `harness/core/tests/` | kit |
-| Skills: setup, incident, contract, cleanup, upgrade | `.claude/skills/harness-*` | kit |
+| Skills: setup, incident, contract, regression, sandbox, cleanup, upgrade | `.claude/skills/harness-*` | kit |
 | Subagents: change reviewer, docs reviewer | `.claude/agents/harness-*` | kit |
-| Settings of the checks, gate states, budgets, allowlists, coverage registry, deploy steps | `harness/config/` | project |
-| Project rules, decisions, incidents, contracts, project tests | `harness/project/` | project |
+| Settings of the checks, gate states, budgets, allowlists, coverage registry, deploy steps, data checks, sandbox, golden tasks | `harness/config/` | project |
+| Project rules, decisions, incidents, contracts, regression cases, project tests | `harness/project/` | project |
 | Hook settings (secret paths, hosts, deploy and publish commands, Stop checks) | `.claude/harness-hooks.json` | project |
 | Hook wiring and deny rules | `.claude/settings.json` | merged |
 | Map of the repository plus a block importing the rules | `CLAUDE.md` | project, block merged |
@@ -75,13 +80,13 @@ The split is by path, so an update never has to guess:
 
 | Gate | What |
 |---|---|
-| QG0 | guard hook (destructive git, secrets, push, deploy, outbound, loops) and Stop hook |
-| QG1 | harness tests, context budget, pinned dependencies, plugin and MCP allowlist |
+| QG0 | guard hook (destructive git, secrets read or written, push, deploy, outbound, decoded code, the agent's own settings, kit files, agent scripts, read-only reviewers, loops), Stop hook, ConfigChange hook, sandbox state, false-block share |
+| QG1 | harness tests, regression cases, context budget, pinned dependencies, plugin and MCP allowlist |
 | QG2 | preflight: committed code, branch, lineage, build stamp, contract, scanners, vulnerabilities |
-| QG3 | deploy check on the target before the swap: API contract, tests, security tests |
+| QG3 | deploy check on the target before the swap: API contract, tests, security tests, regression cases |
 | QG4 | candidate on a separate port (off by default, a trade-off) |
-| QG5 | after the swap: service up, smoke checks |
-| QG6 | data invariants (project counters) |
+| QG5 | after the swap: service up, smoke checks, "after" regression cases |
+| QG6 | data invariants: project counters against fixed rules (`data_checks.py`) |
 | QG7 | nightly snapshot |
 | QG8 | scenarios of people tied to the code |
 
@@ -97,15 +102,17 @@ and metrics (`payload/harness/core/docs/design.md`, section 9).
 | `CLAUDE.md` | rules for working on the kit itself |
 | `payload/` | everything a project receives, laid out as in the project |
 | `tests/` | tests of `harness.py`; the payload tests run inside a fresh install (`check.sh`) |
-| `check.sh` | all checks of the kit before a release |
-| `research/` | the evidence behind the design, the pilot case study, periodic reviews |
+| `check.sh` | all checks of the kit before a release (`--evidence`: also the live run and the mutation check) |
+| `research/` | the evidence behind the design and for each version (`evidence.md`, scripts in `evidence/`), the pilot case study, periodic reviews |
 | `prompts/harness-review.md` | the periodic review: trends, verdicts, improvements as a new version |
 | `extras/claude-context/` | optional: export and restore of an agent's working context between machines |
 
 ## Keeping it current
 
 Run `prompts/harness-review.md` (skill `/harness-review` in this repository) monthly
-and after major model or tool releases. It reads the last review, researches what
+and after major model or tool releases. Each release reruns the evidence
+(`sh check.sh --evidence`, the golden tasks on a demo project) and updates
+`research/evidence.md`. It reads the last review, researches what
 changed, writes a dated verdict with a radar of practices to `research/reviews/`, and
 implements the best few improvements as a new version on a review branch in a separate
 worktree. A human reads the review and merges; projects then upgrade.

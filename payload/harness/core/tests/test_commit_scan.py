@@ -70,6 +70,15 @@ class Lines(unittest.TestCase):
         found = self.sc.scan_lines([("src/x.py", 7, "id 1234567")])  # scan: ignore
         self.assertEqual(found, ["src/x.py:7: record id"])
 
+    def test_secret_finding_does_not_repeat_value(self):
+        # The value of a secret never reaches the output, the deploy journal or the chat.
+        token = "ghp_" + "Q7" * 18
+        key = "AKIA" + "Z" * 16
+        found = self.sc.scan_lines([("src/conf.py", 3, f"TOKEN = '{token}'  # {key}")])
+        self.assertEqual(sorted(found), ["src/conf.py:3: AWS key", "src/conf.py:3: GitHub token",
+                                         "src/conf.py:3: password or token in a literal"])
+        self.assertFalse(any(token in f or key in f or "Q7Q7" in f for f in found))
+
     def test_test_fixture_password_not_a_secret(self):
         self.assertEqual(self.sc.scan_lines([("app/tests/test_x.py", 1, 'password="new-pass-1"')]), [])
         # a token in a test is still a finding
